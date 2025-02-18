@@ -37,7 +37,12 @@
 #define HUB_BODY_BYTELEN   HUB_WORD * 1
 #define HUB_BODY_BYTEMAX   HUB_WORD * 1280 //10KB
 #define HUB_TIMEOUT_MS 5000
+
 #define HUB_HEADER_AUTHSOCK "AUTHSOCK"
+#define HUB_HEADER_REGSOCK_CREATE "REGSOCK_CREATE"
+#define HUB_HEADER_REGSOCK_JOIN "REGSOCK_JOIN"
+
+
 #define HUB_HEADER_AUTHFRONT "AUTHFRONT"
 #define HUB_HEADER_AUTHFRANK "AUTHFRANK"
 #define HUB_HEADER_SENDSOCK "SENDSOCK"
@@ -46,6 +51,8 @@
 #define HUB_HEADER_RECVFRONT "RECVFRONT"
 #define HUB_HEADER_SENDFRANK "SENDFRANK"
 #define HUB_HEADER_RECVFRANK "RECVFRANK"
+
+
 
 #define TRUE 1
 #define FALSE 0
@@ -123,11 +130,11 @@
 #endif
 
 #ifndef SERVER_KEY
-# define SERVER_KEY "tls/sub_priv.pem"
+# define SERVER_KEY "tls/server_priv.pem"
 #endif
 
 #ifndef SERVER_CERT
-# define SERVER_CERT "tls/sub.crt"
+# define SERVER_CERT "tls/server.crt.pem"
 #endif
 
 #ifndef HUB_CA_CERT
@@ -155,9 +162,9 @@ struct CHANNEL_CONTEXT {
     char pw[MAX_PW_LEN];
     SSL *ssl;
     SSL_CTX *ctx;
+    int fd_ptr;
     int fds[MAX_CONN];
-    SSL *ssls[MAX_CONN];
-    SSL_CTX *ctxs[MAX_CONN];
+
 };
 
 struct SOCK_CONTEXT {
@@ -166,7 +173,7 @@ struct SOCK_CONTEXT {
     SSL *ssl;
     SSL_CTX *ctx;
     char id[MAX_ID_LEN];
-
+    int chan_idx;
 };
 
 
@@ -212,13 +219,23 @@ int update_chanctx_from_userinfo(char* id, char* pw);
 int update_chanctx_from_sockctx(int fd, char* id);
 
 
-int get_chanctx_by_id(char* id);
 
-int get_chanctx_by_fd(int fd, int type);
 
 int set_sockctx_by_fd(int fd);
 
 int get_sockctx_by_fd(int fd);
+
+int set_sockctx_id_by_fd(int fd, char* id);
+
+int get_sockctx_id_by_fd(int fd, char* id);
+
+int set_chanctx_by_id(char* id, int create, int fd);
+
+int get_chanctx_by_id(char* id);
+
+int set_sockctx_chan_id_by_fd(int fd, int chan_id);
+
+int get_sockctx_chan_id_by_fd(int fd);
 
 
 

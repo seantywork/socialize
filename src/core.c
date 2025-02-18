@@ -302,49 +302,6 @@ int update_chanctx_from_sockctx(int fd, char* id){
 }
 
 
-int get_chanctx_by_id(char* id){
-
-
-    for(int i = 0; i < MAX_CONN; i++){
-
-        if(strcmp(CHAN_CTX[i].id, id) == 0){
-
-            return i;
-
-        }
-
-    }
-
-
-    return -1;
-}
-
-
-
-int get_chanctx_by_fd(int fd, int type){
-
-
-    if(type == ISSOCK){
-
-        for(int i = 0; i < MAX_CONN; i++){
-
-            if(CHAN_CTX[i].sockfd == fd){
-
-                return i;
-
-            }
-
-        }
-
-
-    }
-
-
-
-    return -1;
-}
-
-
 
 
 
@@ -390,7 +347,135 @@ int get_sockctx_by_fd(int fd){
 }
 
 
+int set_sockctx_id_by_fd(int fd, char* id){
 
+    int idx = get_sockctx_by_fd(fd);
+
+    if(idx < 0){
+
+        return -1;
+    }
+
+    memcpy(SOCK_CTX[idx].id, id, MAX_ID_LEN);
+
+    return 0;
+}
+
+int get_sockctx_id_by_fd(int fd, char* id){
+
+
+
+    int idx = get_sockctx_by_fd(fd);
+
+    if(idx < 0){
+
+        return -1;
+    }
+
+    memcpy(id, SOCK_CTX[idx].id, MAX_ID_LEN);
+
+    return 0;
+
+}
+
+
+
+int set_chanctx_by_id(char* id, int create, int fd){
+
+    int idx = get_chanctx_by_id(id);
+
+    if(create == 1){
+
+        if(idx < 0){
+
+            idx = calloc_chanctx();
+
+            memcpy(CHAN_CTX[idx].id, id, MAX_ID_LEN);
+
+            CHAN_CTX[idx].fds[CHAN_CTX[idx].fd_ptr] = fd;
+
+            CHAN_CTX[idx].fd_ptr += 1;
+
+        } else {
+
+            return -1;
+        }
+
+
+    } else {
+
+
+        if(idx < 0){
+
+            return -2;
+
+        } else {
+
+            CHAN_CTX[idx].fds[CHAN_CTX[idx].fd_ptr] = fd;
+            CHAN_CTX[idx].fd_ptr += 1;
+        }
+
+
+    }
+
+
+    return idx;
+
+
+}
+
+
+int get_chanctx_by_id(char* id){
+
+
+    for(int i = 0; i < MAX_CONN; i++){
+
+        if(strcmp(CHAN_CTX[i].id, id) == 0){
+
+            return i;
+
+        }
+
+    }
+
+
+    return -1;
+}
+
+
+
+int set_sockctx_chan_id_by_fd(int fd, int chan_id){
+
+
+    int idx = get_sockctx_by_fd(fd);
+
+    if(idx < 0){
+
+        return -1;
+    }
+
+    SOCK_CTX[idx].chan_idx = chan_id;
+
+    return 0;
+
+}
+
+
+
+
+int get_sockctx_chan_id_by_fd(int fd){
+
+
+    int idx = get_sockctx_by_fd(fd);
+
+    if(idx < 0){
+
+        return -1;
+    }
+
+    return SOCK_CTX[idx].chan_idx;
+
+}
 
 
 
@@ -411,6 +496,7 @@ int calloc_chanctx(){
 
             CHAN_CTX[i].ssl = NULL;
             CHAN_CTX[i].ctx = NULL;
+
 
             return i;
 
@@ -474,6 +560,7 @@ int calloc_sockctx(){
             SOCK_CTX[i].ctx = NULL;
             SOCK_CTX[i].ssl = NULL;
             SOCK_CTX[i].sockfd = 0;
+            SOCK_CTX[i].chan_idx = -1;
 
             SOCK_CTX[i].allocated = 1;
 
@@ -807,64 +894,6 @@ void ctx_write_packet(struct HUB_PACKET* hp){
     int valwrite = 0;
 
 
-    if(hp->ctx_type == CHAN_ISSOCK){
-        
-
-        valwrite = chanctx_write(ISSOCK, hp->id, HUB_HEADER_BYTELEN, hp->header);
-
-        if(valwrite <= 0){
-
-            printf("packet send header failed\n");
-
-            hp->flag = valwrite;
-
-            return;
-
-        }
-
-        uint8_t body_len_byte[HUB_BODY_BYTELEN] = {0};
-
-        uint64_t body_len_new = 0;
-
-        body_len_new = htonll(hp->body_len);
-
-        
-        memcpy(body_len_byte, &body_len_new, HUB_BODY_BYTELEN);
-
-
-        valwrite = chanctx_write(ISSOCK, hp->id, HUB_BODY_BYTELEN, body_len_byte);
-
-        if(valwrite <= 0){
-
-            printf("packet send body len failed\n");
-
-            hp->flag = valwrite;
-
-            return;
-
-        }
-
-        valwrite = chanctx_write(ISSOCK, hp->id, hp->body_len, hp->wbuff);
-
-
-        if(valwrite <= 0){
-
-            printf("packet send buff failed\n");
-
-            hp->flag = valwrite;
-
-            return;
-
-        } 
-
-        hp->flag = valwrite;
-
-        return;
-
-
-    }
-
-
     if(hp->ctx_type == ISSOCK){
 
         valwrite = sockctx_write(hp->fd, HUB_HEADER_BYTELEN, hp->header);
@@ -932,82 +961,6 @@ void ctx_write_packet(struct HUB_PACKET* hp){
 void ctx_read_packet(struct HUB_PACKET* hp){
 
     int valread = 0;
-
-    if(hp->ctx_type == CHAN_ISSOCK){
-
-        valread = chanctx_read(ISSOCK, hp->id, HUB_HEADER_BYTELEN, hp->header);
-
-        if(valread <= 0){
-
-            printf("packet recv header failed\n");
-
-            hp->flag = valread;
-
-            return;
-
-        }
-
-        uint8_t body_len_byte[HUB_BODY_BYTELEN] = {0};
-
-        uint64_t body_len = 0;
-
-        valread = chanctx_read(ISSOCK, hp->id, HUB_BODY_BYTELEN, body_len_byte);
-
-
-        if(valread <= 0){
-
-            printf("packet recv body len failed\n");
-
-            hp->flag = valread;
-
-            return;
-
-        }
-
-        memcpy(&body_len, body_len_byte, HUB_BODY_BYTELEN);
-
-        body_len = ntohll(body_len);
-
-        if(body_len > HUB_BODY_BYTEMAX){
-
-            printf("packet body len too long \n");
-
-            hp->flag = -10;
-
-            return;
-        }
-
-        hp->body_len = body_len;
-
-        hp->rbuff = (uint8_t*)malloc(hp->body_len * sizeof(uint8_t));
-
-        memset(hp->rbuff, 0, hp->body_len * sizeof(uint8_t));
-
-        valread = chanctx_read(ISSOCK, hp->id, hp->body_len, hp->rbuff);
-
-        if(valread <= 0){
-
-            printf("packet recv body failed\n");
-
-            free(hp->rbuff);
-
-            hp->flag = valread;
-
-            return;
-
-        }
-
-
-        hp->flag = valread;
-
-        return;
-
-
-    }
-
-
-
-
 
     if(hp->ctx_type == ISSOCK){
 

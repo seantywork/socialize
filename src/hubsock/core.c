@@ -305,10 +305,10 @@ void sock_handle_client(int cfd){
 
     pthread_mutex_lock(&G_MTX);
 
-    int chan_idx = get_chanctx_by_fd(cfd, ISSOCK);
+    int sock_idx = get_sockctx_by_fd(cfd);
 
 
-    if(chan_idx < 0){
+    if(sock_idx < 0){
         
         sock_authenticate(cfd);
 
@@ -317,7 +317,18 @@ void sock_handle_client(int cfd){
         return;
     }
 
-    sock_communicate(chan_idx);
+    int chan_idx = get_sockctx_chan_id_by_fd(cfd);
+
+    if(chan_idx < 0){
+
+        sock_register(cfd);
+
+        pthread_mutex_unlock(&G_MTX);
+
+        return;
+    }
+
+    sock_communicate(chan_idx, sock_idx);
 
     pthread_mutex_unlock(&G_MTX);
 
@@ -339,7 +350,7 @@ void sock_authenticate(int cfd){
 
     int sock_idx = get_sockctx_by_fd(cfd);
 
-    fmt_logln(LOGFP,"not registered to chan ctx, auth"); 
+    fmt_logln(LOGFP,"not registered to sock ctx, auth"); 
 
     if(sock_idx < 0){
 
@@ -367,6 +378,17 @@ void sock_authenticate(int cfd){
     
 
 
+    if(strcmp(hp.header, HUB_HEADER_AUTHSOCK) != 0){
+
+        fmt_logln(LOGFP,"not authenticate header: %s", hp.header); 
+
+        free_sockctx(sock_idx, 1);
+
+        return;
+
+    }
+    
+
     int verified = sig_verify(hp.rbuff, CA_CERT);
 
     if(verified < 1){
@@ -383,9 +405,9 @@ void sock_authenticate(int cfd){
 
     
 
-    int ret_cn = extract_common_name(id, hp.rbuff);
+    int ret = extract_common_name(id, hp.rbuff);
 
-    if(ret_cn != 1){
+    if(ret != 1){
 
         fmt_logln(LOGFP,"invalid id"); 
 
@@ -402,6 +424,22 @@ void sock_authenticate(int cfd){
 
     free(hp.rbuff);
 
+    ret = set_sockctx_id_by_fd(cfd, id);
+
+    if (ret < 0){
+
+        fmt_logln(LOGFP, "failed to set sockctx");
+
+        free_sockctx(sock_idx, 1);
+
+        free(hp.rbuff);
+
+        return;
+
+    }
+
+    /*
+
     int chan_idx = update_chanctx_from_sockctx(cfd, id);
 
     if (chan_idx < 0){
@@ -415,6 +453,7 @@ void sock_authenticate(int cfd){
     }
 
 
+    */
     uint64_t body_len = strlen("SUCCESS") + 1;
 
     memset(hp.header, 0, HUB_HEADER_BYTELEN);
@@ -443,7 +482,7 @@ void sock_authenticate(int cfd){
 
     }
 
-    fmt_logln(LOGFP, "sent");
+    fmt_logln(LOGFP, "auth success sent");
 
     return;
 
@@ -451,28 +490,140 @@ void sock_authenticate(int cfd){
 }
 
 
+void sock_register(int cfd){
 
-void sock_communicate(int chan_idx){
 
-    fmt_logln(LOGFP, "incoming sock communication to front");
+    int valread;
+    int valwrite;
 
-    int frontfd = CHAN_CTX[chan_idx].frontfd;
+    int result;
 
-    if(frontfd == 0){
+    int is_create;
 
-        fmt_logln(LOGFP, "no front exists for communication");
+    struct HUB_PACKET hp;
+
+
+    uint8_t id[MAX_ID_LEN] = {0};
+
+    int sock_idx = get_sockctx_by_fd(cfd);
+
+    fmt_logln(LOGFP,"not registered to sock ctx, auth"); 
+
+    if(sock_idx < 0){
+
+        fmt_logln(LOGFP,"failed to get sock idx"); 
+
+        return;
+    }
+
+
+    hp.ctx_type = ISSOCK;
+    hp.fd = SOCK_CTX[sock_idx].sockfd;
+    
+    ctx_read_packet(&hp);
+
+    if(hp.flag <= 0){
+
+
+        fmt_logln(LOGFP,"failed to read sock"); 
+
+        free_sockctx(sock_idx, 1);
 
         return;
 
     }
     
-    fmt_logln(LOGFP, "front exists");
 
-    struct HUB_PACKET hp;
+    if(strcmp(hp.header, HUB_HEADER_REGSOCK_CREATE) == 0){
+
+        is_create = 1;
+
+        memcpy(id, hp.rbuff, MAX_ID_LEN);
+
+        result = set_chanctx_by_id(id, 1, cfd);
+
+    } else if (strcmp(hp.header, HUB_HEADER_REGSOCK_JOIN) == 0){
+
+        is_create = 0;
+
+        memcpy(id, hp.rbuff, MAX_ID_LEN);
+
+        result = set_chanctx_by_id(id, 0, cfd);
+
+    } else {
+
+        fmt_logln(LOGFP,"not register header: %s", hp.header); 
+
+        free_sockctx(sock_idx, 1);
+
+        return;
+
+    }
+    
+
+    if (result < 0){
+
+        fmt_logln(LOGFP,"failed to register: result: %d", result); 
+
+        free_sockctx(sock_idx, 1);
+
+        return;
+    }
+
+
+    uint64_t body_len = strlen("SUCCESS") + 1;
+
+    memset(hp.header, 0, HUB_HEADER_BYTELEN);
+
+    memset(hp.wbuff, 0, MAX_BUFF);
 
     hp.ctx_type = CHAN_ISSOCK;
 
-    strcpy(hp.id, CHAN_CTX[chan_idx].id);
+    if(is_create == 1){
+
+        strcpy(hp.header, HUB_HEADER_REGSOCK_CREATE);
+
+    } else {
+
+        strcpy(hp.header, HUB_HEADER_REGSOCK_JOIN);
+    }
+
+
+    hp.body_len = body_len;
+
+    strcat(hp.wbuff,"SUCCESS");
+
+    strcpy(hp.id, id);
+
+    fmt_logln(LOGFP, "writing auth result..");
+    
+    ctx_write_packet(&hp);
+
+    if(hp.flag <= 0){
+
+        fmt_logln(LOGFP, "failed to send");
+
+        return;
+
+    }
+
+    fmt_logln(LOGFP, "register success sent");
+
+    return;
+
+}
+
+
+void sock_communicate(int chan_idx, int sock_idx){
+
+    fmt_logln(LOGFP, "incoming sock communication ");
+
+
+    struct HUB_PACKET hp;
+
+    hp.ctx_type = ISSOCK;
+
+    hp.fd = SOCK_CTX[sock_idx].sockfd;
 
     ctx_read_packet(&hp);
 
@@ -488,9 +639,9 @@ void sock_communicate(int chan_idx){
 
     memset(hp.wbuff, 0, MAX_BUFF);
 
-    hp.ctx_type = CHAN_ISFRONT;
+    hp.ctx_type = ISSOCK;
 
-    strcpy(hp.header, HUB_HEADER_RECVFRONT);
+    //strcpy(hp.header, HUB_HEADER_RECVFRONT);
 
     strncpy(hp.wbuff, hp.rbuff, hp.body_len);
 
@@ -498,16 +649,24 @@ void sock_communicate(int chan_idx){
 
     free(hp.rbuff);
 
-    ctx_write_packet(&hp);
+    int counter = CHAN_CTX[chan_idx].fd_ptr;
 
-    if(hp.flag <= 0){
+    for(int i = 0; i < counter; i++){
 
-        fmt_logln(LOGFP, "failed to send to front");
+        hp.fd = CHAN_CTX[chan_idx].fds[i];
 
-        return;
-    } 
+        ctx_write_packet(&hp);
 
-    fmt_logln(LOGFP, "send to front");
+        if(hp.flag <= 0){
+
+            fmt_logln(LOGFP, "failed to send to peer: %d", i);
+
+            continue;
+        } 
+    }
+
+
+    fmt_logln(LOGFP, "sent to peer");
 
     return;
 }

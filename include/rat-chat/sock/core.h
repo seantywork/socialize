@@ -17,6 +17,8 @@ void sock_handle_client(int cfd);
 
 void sock_authenticate(int cfd);
 
-void sock_communicate(int chan_idx);
+void sock_register(int cfd);
+
+void sock_communicate(int chan_idx, int sock_idx);
 
 #endif

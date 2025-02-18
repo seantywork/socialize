@@ -47,12 +47,12 @@ vendor:
 
 dev: $(OBJS) $(DEP_OBJS)
 
-	gcc $(GCC_DEV_FLAGS) $(INCLUDES) -o rat-chat.out cmd/rat-chat/main.c $(OBJS) $(DEP_OBJS) $(LIBS) 
+	gcc $(GCC_DEV_FLAGS) $(INCLUDES) -o engine.out cmd/engine/main.c $(OBJS) $(DEP_OBJS) $(LIBS) 
 
 
 release: $(OBJS) $(DEP_OBJS)
 
-	gcc $(GCC_REL_FLAGS) $(INCLUDES) -o rat-chat.out cmd/rat-chat/main.c $(OBJS) $(DEP_OBJS) $(LIBS) 
+	gcc $(GCC_REL_FLAGS) $(INCLUDES) -o engine.out cmd/engine/main.c $(OBJS) $(DEP_OBJS) $(LIBS) 
 
 
 

@@ -4,17 +4,43 @@
 #include "rat-chat/core.h"
 
 
+#ifndef VERIFICATION_LOCATION
+# define VERIFICATION_LOCATION "tls/ca.crt.pem"
+#endif
+
+
+# define ASSERT(x) { \
+  if(!(x)) { \
+    fprintf(stderr, "Assertion: %s: function %s, line %d\n", (char*)(__FILE__), (char*)(__func__), (int)__LINE__); \
+    exit(SIGTRAP); \
+  } \
+}
 
 
 
-void run_cli();
+
+void run_cli(char* addr);
 
 
-void run_cli_test(int tc);
+void run_cli_test(char* addr, int tc);
+
+
+int connect_to_engine(char* addr, long timeout);
+
+
+void* reader();
 
 
 
+int verify_callback(int preverify, X509_STORE_CTX* x509_ctx);
 
+void init_openssl_library(void);
+void print_cn_name(const char* label, X509_NAME* const name);
+void print_san_name(const char* label, X509* const cert);
+void print_error_string(unsigned long err, const char* const label);
+
+extern int cli_done;
+extern char* PREFERRED_CIPHERS;
 
 
 #endif 

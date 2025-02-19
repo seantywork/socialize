@@ -4,28 +4,35 @@
 
 
 #include <stdio.h> 
-#include <netdb.h> 
 #include <netinet/in.h> 
 #include <stdlib.h> 
 #include <string.h> 
 #include <stdint.h>
-#include <sys/socket.h> 
-#include <sys/types.h> 
+#include <sys/types.h>
+#include <sys/socket.h>  
 #include <unistd.h> 
 #include <time.h>
 #include <endian.h>
 #include <pthread.h>
 #include <stdarg.h>
 #include <sys/time.h>
-// ep headers
+#include <poll.h>
+#include <signal.h>
 #include <fcntl.h>
 #include <sys/epoll.h>
 #include <errno.h>
 #include <arpa/inet.h>
-// ssl headers
-#include <signal.h>
+#include <netdb.h> 
+
 #include <openssl/ssl.h>
 #include <openssl/err.h>
+#include <openssl/bio.h>
+#include <openssl/pem.h>
+#include <openssl/conf.h>
+#include <openssl/x509.h>
+#include <openssl/buffer.h>
+#include <openssl/x509v3.h>
+#include <openssl/opensslconf.h>
 
 #include "mongoose/mongoose.h"
 #include "cJSON/cJSON.h"

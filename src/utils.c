@@ -81,6 +81,53 @@ int bin2hex(uint8_t* hexarray, int arrlen, uint8_t* bytearray){
 }
 
 
+int get_host_port(char* hostname, int* port, char* addr){
+
+    char addr_cp[MAX_ID_LEN]  = {0};
+
+    char port_str[MAX_ID_LEN] = {0};
+
+    strcpy(addr_cp, addr);
+
+    char* delim = ":";
+    char *token;
+
+    token = strtok(addr, delim);
+
+    int idx = 0;
+
+    while(token != NULL) {
+    
+        if(idx == 0){
+
+            strcpy(hostname, token);
+
+        } else if (idx == 1){
+
+
+            strcpy(port_str, token);
+
+            sscanf(port_str, "%d", port);
+
+        } else {
+
+            return -1;
+        }
+
+        token = strtok(NULL, delim);
+
+        idx += 1;
+
+    }
+
+    if (idx < 2){
+        return -2;
+    }
+
+    return 0;
+
+}
+
 
 void get_current_time_string(char* tstr){
 

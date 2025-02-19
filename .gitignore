@@ -11,3 +11,4 @@
 *.mod.c
 .vscode
 *.pem
+*.txt

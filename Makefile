@@ -22,6 +22,9 @@ OBJS += utils.o
 OBJS += sock.o
 OBJS += front.o
 
+CLI_OBJS := cli.o
+CLI_OBJS += utils.o
+
 DEP_OBJS := mongoose.o
 DEP_OBJS += cJSON.o
 
@@ -45,15 +48,20 @@ vendor:
 	cd vendor && rm -rf cJSON && $(DEP_CJSON)
 
 
-dev: $(OBJS) $(DEP_OBJS)
+dev: $(OBJS) $(CLI_OBJS) $(DEP_OBJS)
 
 	gcc $(GCC_DEV_FLAGS) $(INCLUDES) -o engine.out cmd/engine/main.c $(OBJS) $(DEP_OBJS) $(LIBS) 
+
+	gcc $(GCC_DEV_FLAGS) $(INCLUDES) -o cli.out cmd/cli/main.c $(CLI_OBJS) $(LIBS) 
+
+
 
 
 release: $(OBJS) $(DEP_OBJS)
 
 	gcc $(GCC_REL_FLAGS) $(INCLUDES) -o engine.out cmd/engine/main.c $(OBJS) $(DEP_OBJS) $(LIBS) 
 
+	gcc $(GCC_REL_FLAGS) $(INCLUDES) -o cli.out cmd/cli/main.c $(CLI_OBJS) $(LIBS) 
 
 
 
@@ -73,6 +81,12 @@ sock.o:
 front.o:
 
 	gcc $(GCC_OBJ_FLAGS) $(INCLUDES) -o front.o src/front/front.c 
+
+
+cli.o:
+
+	gcc $(GCC_OBJ_FLAGS) $(INCLUDES) -o cli.o src/cli/cli.c 
+
 
 
 mongoose.o:

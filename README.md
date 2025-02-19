@@ -1,3 +1,3 @@
 # rat-chat
 
-a dumb way to share linux system info, excute commands, and ... also chat on the terminal
+the old but only beautiful way to have a chat is on terminal

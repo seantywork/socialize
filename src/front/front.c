@@ -1,4 +1,5 @@
-#include   "rat-chat/front/core.h"
+#include   "rat-chat/ctl.h"
+#include   "rat-chat/front/front.h"
 #include   "rat-chat/utils.h"
 
 

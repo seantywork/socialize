@@ -1,4 +1,5 @@
-#include   "rat-chat/sock/core.h"
+#include   "rat-chat/ctl.h"
+#include   "rat-chat/sock/sock.h"
 #include   "rat-chat/utils.h"
 
 int SOCK_FD;
@@ -8,6 +9,10 @@ struct epoll_event SOCK_EVENT;
 struct epoll_event *SOCK_EVENTARRAY;
 
 char CA_CERT[MAX_PW_LEN] = {0};
+
+char CA_PRIV[MAX_PW_LEN] = {0};
+
+char CA_PUB[MAX_PW_LEN] = {0};
 
 void sock_listen_and_serve(void* varg){
 
@@ -20,6 +25,27 @@ void sock_listen_and_serve(void* varg){
     if(result < 0){
 
         fmt_logln(LOGFP, "failed to read ca cert");
+
+        return;
+
+    }
+
+    result = read_file_to_buffer(CA_PRIV, MAX_PW_LEN, HUB_CA_PRIV);
+
+    if(result < 0){
+
+        fmt_logln(LOGFP, "failed to read ca priv");
+
+        return;
+
+    }
+
+
+    result = read_file_to_buffer(CA_PUB, MAX_PW_LEN, HUB_CA_PUB);
+
+    if(result < 0){
+
+        fmt_logln(LOGFP, "failed to read ca pub");
 
         return;
 

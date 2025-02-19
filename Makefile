@@ -17,7 +17,7 @@ INCLUDES := -I./include -I./vendor
 LIBS := -lpthread -lssl -lcrypto 
 
 
-OBJS := core.o
+OBJS := ctl.o
 OBJS += utils.o
 OBJS += sock.o
 OBJS += front.o
@@ -57,9 +57,9 @@ release: $(OBJS) $(DEP_OBJS)
 
 
 
-core.o:
+ctl.o:
 
-	gcc $(GCC_OBJ_FLAGS) $(INCLUDES) -o core.o src/core.c 
+	gcc $(GCC_OBJ_FLAGS) $(INCLUDES) -o ctl.o src/ctl.c 
 
 
 utils.o:
@@ -68,11 +68,11 @@ utils.o:
 
 sock.o:
 
-	gcc $(GCC_OBJ_FLAGS) $(INCLUDES) -o sock.o src/hubsock/core.c 
+	gcc $(GCC_OBJ_FLAGS) $(INCLUDES) -o sock.o src/sock/sock.c 
 
 front.o:
 
-	gcc $(GCC_OBJ_FLAGS) $(INCLUDES) -o front.o src/hubfront/core.c 
+	gcc $(GCC_OBJ_FLAGS) $(INCLUDES) -o front.o src/front/front.c 
 
 
 mongoose.o:

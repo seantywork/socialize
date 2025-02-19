@@ -1,6 +1,6 @@
 
-#include "rat-chat/sock/core.h"
-#include "rat-chat/front/core.h"
+#include "rat-chat/sock/sock.h"
+#include "rat-chat/front/front.h"
 
 #include "rat-chat/utils.h"
 FILE* LOGFP;

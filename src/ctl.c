@@ -1,4 +1,4 @@
-#include "rat-chat/core.h"
+#include "rat-chat/ctl.h"
 
 
 struct CHANNEL_CONTEXT CHAN_CTX[MAX_CONN];

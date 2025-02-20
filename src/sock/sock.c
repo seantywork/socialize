@@ -298,6 +298,7 @@ void sock_handle_conn(){
 
         SOCK_CTX[sock_idx].ctx = ctx;
         SOCK_CTX[sock_idx].ssl = ssl;
+        SOCK_CTX[sock_idx].auth = 0;
 
 
         SOCK_EVENT.data.fd = infd;
@@ -336,12 +337,20 @@ void sock_handle_client(int cfd){
 
     if(sock_idx < 0){
         
+        pthread_mutex_unlock(&G_MTX);
+
+        return;
+    }
+
+    if(SOCK_CTX[sock_idx].auth == 0){
+
         sock_authenticate(cfd);
 
         pthread_mutex_unlock(&G_MTX);
 
         return;
     }
+
 
     int chan_idx = get_sockctx_chan_id_by_fd(cfd);
 
@@ -464,6 +473,8 @@ void sock_authenticate(int cfd){
 
     }
 
+    SOCK_CTX[sock_idx].auth = 1;
+
     /*
 
     int chan_idx = update_chanctx_from_sockctx(cfd, id);
@@ -486,7 +497,7 @@ void sock_authenticate(int cfd){
 
     memset(hp.wbuff, 0, MAX_BUFF);
 
-    hp.ctx_type = CHAN_ISSOCK;
+    hp.ctx_type = ISSOCK;
 
     strcpy(hp.header, HUB_HEADER_AUTHSOCK);
 
@@ -533,7 +544,7 @@ void sock_register(int cfd){
 
     int sock_idx = get_sockctx_by_fd(cfd);
 
-    fmt_logln(LOGFP,"not registered to sock ctx, auth"); 
+    fmt_logln(LOGFP,"not registered to sock ctx, register"); 
 
     if(sock_idx < 0){
 
@@ -603,7 +614,7 @@ void sock_register(int cfd){
 
     memset(hp.wbuff, 0, MAX_BUFF);
 
-    hp.ctx_type = CHAN_ISSOCK;
+    hp.ctx_type = ISSOCK;
 
     if(is_create == 1){
 

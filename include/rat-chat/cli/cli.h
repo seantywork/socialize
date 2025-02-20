@@ -27,6 +27,11 @@ void run_cli_test(char* addr, int tc);
 
 int connect_to_engine(char* addr, long timeout);
 
+int auth();
+
+int join();
+
+void chat();
 
 void* reader();
 
@@ -42,5 +47,15 @@ void print_error_string(unsigned long err, const char* const label);
 extern int cli_done;
 extern char* PREFERRED_CIPHERS;
 
+
+extern int TEST_CASE;
+
+extern SSL_CTX* ctx;
+extern SSL *ssl ;
+
+extern uint8_t header[HUB_HEADER_BYTELEN];
+extern uint8_t body_len[HUB_BODY_BYTELEN];
+extern uint64_t body_len_new;
+extern uint8_t *body;
 
 #endif 

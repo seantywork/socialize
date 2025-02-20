@@ -198,6 +198,7 @@ struct SOCK_CONTEXT {
     int sockfd;
     SSL *ssl;
     SSL_CTX *ctx;
+    int auth;
     char id[MAX_ID_LEN];
     int chan_idx;
 };

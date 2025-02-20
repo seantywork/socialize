@@ -3,16 +3,17 @@
 
 extern char* PREFERRED_CIPHERS = "HIGH:!aNULL:!kRSA:!SRP:!PSK:!CAMELLIA:!RC4:!MD5:!DSS";
 
+SSL_CTX* ctx = NULL;
+SSL *ssl = NULL;
+
+uint8_t header[HUB_HEADER_BYTELEN] = {0};
+uint8_t body_len[HUB_BODY_BYTELEN] = {0};
+uint64_t body_len_new = 0;
+uint8_t *body = NULL;
+
 
 
 void run_cli(char* addr){
-
-
-
-}
-
-
-void run_cli_test(char* addr, int tc){
 
     long res = 1;
     int ret = 1;
@@ -20,8 +21,7 @@ void run_cli_test(char* addr, int tc){
     
     int fd = 0;
     SSL_METHOD *method = NULL;
-    SSL_CTX* ctx = NULL;
-    SSL *ssl = NULL;
+
     
 
     char hostname[MAX_ID_LEN] = {0};
@@ -86,6 +86,7 @@ void run_cli_test(char* addr, int tc){
 
     SSL_set_fd(ssl, fd);
 
+    
     res = SSL_connect(ssl);
 
     if(res != 1){
@@ -95,6 +96,7 @@ void run_cli_test(char* addr, int tc){
         return -6;
     }
 
+    
     X509* cert = SSL_get_peer_certificate(ssl);
     
     if(cert == NULL){
@@ -114,16 +116,25 @@ void run_cli_test(char* addr, int tc){
         return -8;
     }
 
+    res = auth();
 
-    do {
+    if (res < 0){
 
-        sleep(1);
+        printf("failed to do auth\n");
 
-        printf("sleeping\n");
+        return res;
+    }
 
+    res = join();
 
-    } while(cli_done == 0);
+    if (res < 0){
 
+        printf("failed to do join\n");
+
+        return res;
+    }
+
+    chat();
 
     if(NULL != ctx){
         SSL_CTX_free(ctx);
@@ -301,6 +312,335 @@ int connect_to_engine(char* addr, long timeout){
 }
 
 
+int auth(){
+
+    char cert[MAX_PW_LEN] = {0};
+
+    int result = 0;
+
+    if(TEST_CASE == 1){
+
+        result = read_file_to_buffer(cert, MAX_PW_LEN, SUB1_CERT);
+
+    }
+
+
+    if(TEST_CASE == 2){
+
+        result = read_file_to_buffer(cert, MAX_PW_LEN, SUB2_CERT);
+
+    }
+
+
+    if (result < 0){
+
+        printf("failed to get cert\n");
+
+        return result;
+    }
+
+    uint64_t result64 = (uint64_t)result;
+
+    strcpy(header, HUB_HEADER_AUTHSOCK);
+
+    body_len_new = htonll(result64);
+
+    memcpy(body_len, &body_len_new, HUB_BODY_BYTELEN);
+
+    body = (uint8_t*)malloc(result * sizeof(uint8_t));
+
+    memset(body, 0, result * sizeof(uint8_t));
+
+    memcpy(body, cert, result * sizeof(uint8_t));
+
+    result = SSL_write(ssl, header, HUB_HEADER_BYTELEN);
+
+    if (result < 0){
+
+        printf("write auth header failed\n");
+
+        free(body);
+
+        return result;
+    }
+
+    result = SSL_write(ssl, body_len, HUB_BODY_BYTELEN);
+
+    if (result < 0){
+
+        printf("write auth body len failed\n");
+
+        free(body);
+
+        return result;
+    }
+
+    result = SSL_write(ssl, body, result64 * sizeof(uint8_t));
+
+    if (result < 0){
+
+        printf("write auth body failed\n");
+
+        free(body);
+
+        return result;
+    }
+
+
+    free(body);
+
+    int recvlen = 0;
+
+    int n = 0;
+
+    while(recvlen != HUB_HEADER_BYTELEN){
+
+        n = SSL_read(ssl, header + recvlen, HUB_HEADER_BYTELEN - recvlen);
+
+        if(n <= 0){
+
+            printf("read header failed\n");
+
+            return -1;
+        }
+
+        recvlen += n;
+
+    }
+
+    recvlen = 0;
+
+    while(recvlen != HUB_BODY_BYTELEN){
+
+        n = SSL_read(ssl, body_len + recvlen, HUB_BODY_BYTELEN - recvlen);
+
+        if(n <= 0){
+
+            printf("read body len failed\n");
+
+            return -1;
+        }
+
+        recvlen += n;
+
+    }
+
+    memcpy(&body_len_new, body_len, HUB_BODY_BYTELEN);
+
+    uint64_t body_len_n = ntohll(body_len_new);
+
+    body = (uint8_t*)malloc(body_len_n * sizeof(uint8_t));
+
+    recvlen = 0;
+
+    while(recvlen != body_len_n){
+
+        n = SSL_read(ssl, body + recvlen, body_len_n - (uint64_t)recvlen);
+
+        if(n <= 0){
+
+            printf("read body failed\n");
+
+            free(body);
+
+            return -1;
+        }
+
+        recvlen += n;
+
+    }
+
+    printf("auth: %s\n", body);
+
+    free(body);
+
+    return 0;
+
+}
+
+int join(){
+
+    char action[16] = {0};
+    char roomid[MAX_ID_LEN] = {0};
+
+    printf("[ create | join ]:  ");
+
+    fgets(action, 16, stdin);
+
+    for(int i = 0 ; i < 16; i++){
+
+        if(action[i] == '\n'){
+
+            action[i] = 0;
+
+            break;
+        }
+    }
+
+    memset(header, 0, HUB_HEADER_BYTELEN);
+
+    if(strncmp(action, "create", 16) == 0){
+
+        strcpy(header, HUB_HEADER_REGSOCK_CREATE);
+
+    } else if(strncmp(action, "join", 16) == 0){
+
+        strcpy(header, HUB_HEADER_REGSOCK_JOIN);
+
+    } else {
+
+        printf("wrong action: %s\n", action);
+
+        return -1;
+    }
+
+    printf("roomid?: ");
+
+    fgets(roomid, MAX_ID_LEN, stdin);
+
+    int idlen = 0;
+
+    for(int i = 0 ; i < MAX_ID_LEN; i++){
+
+        if(roomid[i] == '\n'){
+
+            roomid[i] = 0;
+
+            break;
+        }
+
+        idlen += 1;
+    }
+
+    uint64_t result64 = (uint64_t)idlen;
+
+    body_len_new = htonll(result64);
+
+    memcpy(body_len, &body_len_new, HUB_BODY_BYTELEN);
+
+    body = (uint8_t*)malloc(result64 * sizeof(uint8_t));
+
+    memset(body, 0, result64 * sizeof(uint8_t));
+
+    memcpy(body, roomid, result64 * sizeof(uint8_t));
+
+
+
+    int result = SSL_write(ssl, header, HUB_HEADER_BYTELEN);
+
+    if (result < 0){
+
+        printf("write join header failed\n");
+
+        free(body);
+
+        return result;
+    }
+
+    result = SSL_write(ssl, body_len, HUB_BODY_BYTELEN);
+
+    if (result < 0){
+
+        printf("write join body len failed\n");
+
+        free(body);
+
+        return result;
+    }
+ 
+    result = SSL_write(ssl, body, result64 * sizeof(uint8_t));
+
+    if (result < 0){
+
+        printf("write join body failed\n");
+
+        free(body);
+
+        return result;
+    }
+
+    free(body);
+
+    int recvlen = 0;
+
+    int n = 0;
+
+    while(recvlen != HUB_HEADER_BYTELEN){
+
+        n = SSL_read(ssl, header + recvlen, HUB_HEADER_BYTELEN - recvlen);
+
+        if(n <= 0){
+
+            printf("read header failed\n");
+
+            return -1;
+        }
+
+        recvlen += n;
+
+    }
+
+    recvlen = 0;
+
+    while(recvlen != HUB_BODY_BYTELEN){
+
+        n = SSL_read(ssl, body_len + recvlen, HUB_BODY_BYTELEN - recvlen);
+
+        if(n <= 0){
+
+            printf("read body len failed\n");
+
+            return -1;
+        }
+
+        recvlen += n;
+
+    }
+
+    memcpy(&body_len_new, body_len, HUB_BODY_BYTELEN);
+
+    uint64_t body_len_n = ntohll(body_len_new);
+
+    body = (uint8_t*)malloc(body_len_n * sizeof(uint8_t));
+
+    recvlen = 0;
+
+    while(recvlen != body_len_n){
+
+        n = SSL_read(ssl, body + recvlen, body_len_n - (uint64_t)recvlen);
+
+        if(n <= 0){
+
+            printf("read body failed\n");
+
+            free(body);
+
+            return -1;
+        }
+
+        recvlen += n;
+
+    }
+
+    printf("join: %s\n", body);
+
+    free(body);
+
+    return 0;
+
+}
+
+
+void chat(){
+
+    printf("start the chat!\n");
+
+    sleep(5);
+
+
+
+}
+
 void* reader(){
 
 
@@ -462,11 +802,8 @@ int verify_callback(int preverify, X509_STORE_CTX* x509_ctx)
             fprintf(stdout, "  Error = %d\n", err);
     }
 
-#if !defined(NDEBUG)
-    return 1;
-#else
+
     return preverify;
-#endif
 }
 
 void print_error_string(unsigned long err, const char* const label)

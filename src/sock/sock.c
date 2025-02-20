@@ -1,6 +1,6 @@
-#include   "rat-chat/ctl.h"
-#include   "rat-chat/sock/sock.h"
-#include   "rat-chat/utils.h"
+#include   "chat/ctl.h"
+#include   "chat/sock/sock.h"
+#include   "chat/utils.h"
 
 int SOCK_FD;
 int SOCK_SERVLEN;

@@ -1,6 +1,6 @@
-#include   "rat-chat/ctl.h"
-#include   "rat-chat/front/front.h"
-#include   "rat-chat/utils.h"
+#include   "chat/ctl.h"
+#include   "chat/front/front.h"
+#include   "chat/utils.h"
 
 
 struct settings s_settings = {true, 1, 57, NULL};
@@ -116,7 +116,7 @@ void* front_listen_and_serve(void* varg){
 
     mg_mgr_init(&mgr);
 
-    s_settings.device_name = strdup("rat-chat");
+    s_settings.device_name = strdup("chat");
 
     mg_http_listen(&mgr, HTTP_URL, route, NULL);
 

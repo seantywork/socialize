@@ -1,3 +1,3 @@
-# rat-chat
+# chat
 
-the old but only beautiful way to have a chat is on terminal
+chat on terminal is the only way to truly socialize

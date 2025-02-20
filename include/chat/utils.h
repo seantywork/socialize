@@ -3,7 +3,7 @@
 
 
 
-#include "rat-chat/core.h"
+#include "chat/core.h"
 
 
 #define MAX_TIMESTR_LEN 80

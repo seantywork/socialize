@@ -1,7 +1,7 @@
 #ifndef _FRANK_HUB_FRONT_H_
 #define _FRANK_HUB_FRONT_H_
 
-#include "rat-chat/core.h"
+#include "chat/core.h"
 
 
 

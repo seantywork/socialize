@@ -1,8 +1,8 @@
 
-#include "rat-chat/sock/sock.h"
-#include "rat-chat/front/front.h"
+#include "chat/sock/sock.h"
+#include "chat/front/front.h"
 
-#include "rat-chat/utils.h"
+#include "chat/utils.h"
 FILE* LOGFP;
 
 pthread_mutex_t G_MTX;

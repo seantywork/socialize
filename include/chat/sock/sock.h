@@ -3,7 +3,7 @@
 
 
 
-#include "rat-chat/core.h"
+#include "chat/core.h"
 
 
 

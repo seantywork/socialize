@@ -1,5 +1,5 @@
-#include "rat-chat/cli/cli.h"
-#include "rat-chat/utils.h"
+#include "chat/cli/cli.h"
+#include "chat/utils.h"
 
 extern char* PREFERRED_CIPHERS = "HIGH:!aNULL:!kRSA:!SRP:!PSK:!CAMELLIA:!RC4:!MD5:!DSS";
 

@@ -1,7 +1,7 @@
 #ifndef _FRANK_HUB_CTL_H_
 #define _FRANK_HUB_CTL_H_
 
-#include "rat-chat/core.h"
+#include "chat/core.h"
 
 int make_socket_non_blocking (int sfd);
 

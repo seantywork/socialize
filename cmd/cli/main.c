@@ -1,5 +1,5 @@
-#include "rat-chat/cli/cli.h"
-#include "rat-chat/utils.h"
+#include "chat/cli/cli.h"
+#include "chat/utils.h"
 
 int cli_done = 0;
 int TEST_CASE = -1;

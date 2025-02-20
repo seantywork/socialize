@@ -1,7 +1,7 @@
 #ifndef _FRANK_CLI_H_
 #define _FRANK_CLI_H_
 
-#include "rat-chat/core.h"
+#include "chat/core.h"
 
 
 #ifndef VERIFICATION_LOCATION

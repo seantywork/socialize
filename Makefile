@@ -31,7 +31,7 @@ DEP_OBJS += cJSON.o
 
 all: 
 
-	@echo "rat-chat: dev, release"
+	@echo "chat: dev, release"
 
 
 deps:

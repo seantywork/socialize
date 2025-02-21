@@ -1,6 +1,6 @@
-#include   "chat/ctl.h"
-#include   "chat/sock/sock.h"
-#include   "chat/utils.h"
+#include   "socialize/ctl.h"
+#include   "socialize/sock/sock.h"
+#include   "socialize/utils.h"
 
 int SOCK_FD;
 int SOCK_SERVLEN;

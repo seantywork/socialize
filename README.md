@@ -1,3 +1,3 @@
-# chat
+# socialize
 
-chat on terminal is the only way to truly socialize
+I socialize on terminal

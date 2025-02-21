@@ -1,7 +1,7 @@
-#ifndef _FRANK_HUB_FRONT_H_
-#define _FRANK_HUB_FRONT_H_
+#ifndef _SOCIALIZE_HUB_FRONT_H_
+#define _SOCIALIZE_HUB_FRONT_H_
 
-#include "chat/core.h"
+#include "socialize/core.h"
 
 
 

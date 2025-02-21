@@ -1,9 +1,9 @@
-#ifndef _FRANK_HUB_UTILS_H_
-#define _FRANK_HUB_UTILS_H_
+#ifndef _SOCIALIZE_UTILS_H_
+#define _SOCIALIZE_UTILS_H_
 
 
 
-#include "chat/core.h"
+#include "socialize/core.h"
 
 
 #define MAX_TIMESTR_LEN 80

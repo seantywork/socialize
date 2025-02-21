@@ -1,9 +1,9 @@
-#ifndef _FRANK_HUB_SOCK_H_
-#define _FRANK_HUB_SOCK_H_
+#ifndef _SOCIALIZE_HUB_SOCK_H_
+#define _SOCIALIZE_HUB_SOCK_H_
 
 
 
-#include "chat/core.h"
+#include "socialize/core.h"
 
 
 

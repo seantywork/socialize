@@ -1,7 +1,7 @@
-#ifndef _FRANK_HUB_CTL_H_
-#define _FRANK_HUB_CTL_H_
+#ifndef _SOCIALIZE_CTL_H_
+#define _SOCIALIZE_CTL_H_
 
-#include "chat/core.h"
+#include "socialize/core.h"
 
 int make_socket_non_blocking (int sfd);
 

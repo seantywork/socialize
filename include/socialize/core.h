@@ -1,5 +1,5 @@
-#ifndef _FRANK_HUB_H_
-#define _FRANK_HUB_H_
+#ifndef _SOCIALIZE_CORE_H_
+#define _SOCIALIZE_CORE_H_
 
 
 

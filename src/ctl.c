@@ -1,4 +1,4 @@
-#include "chat/ctl.h"
+#include "socialize/ctl.h"
 
 
 struct CHANNEL_CONTEXT CHAN_CTX[MAX_CONN];

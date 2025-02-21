@@ -31,7 +31,7 @@ DEP_OBJS += cJSON.o
 
 all: 
 
-	@echo "chat: dev, release"
+	@echo "socialize: dev, release"
 
 
 deps:

@@ -1,7 +1,7 @@
-#ifndef _FRANK_CLI_H_
-#define _FRANK_CLI_H_
+#ifndef _SOCIALIZE_CLI_H_
+#define _SOCIALIZE_CLI_H_
 
-#include "chat/core.h"
+#include "socialize/core.h"
 
 
 #ifndef VERIFICATION_LOCATION
@@ -19,10 +19,7 @@
 
 
 
-void run_cli(char* addr);
-
-
-void run_cli_test(char* addr, int tc);
+int run_cli(char* addr);
 
 
 int connect_to_engine(char* addr, long timeout);
@@ -31,7 +28,7 @@ int auth();
 
 int join();
 
-void chat();
+void socialize();
 
 void* reader();
 

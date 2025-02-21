@@ -1,5 +1,5 @@
-#include "chat/cli/cli.h"
-#include "chat/utils.h"
+#include "socialize/cli/cli.h"
+#include "socialize/utils.h"
 
 extern char* PREFERRED_CIPHERS = "HIGH:!aNULL:!kRSA:!SRP:!PSK:!CAMELLIA:!RC4:!MD5:!DSS";
 
@@ -13,7 +13,7 @@ uint8_t *body = NULL;
 
 
 
-void run_cli(char* addr){
+int run_cli(char* addr){
 
     long res = 1;
     int ret = 1;
@@ -134,7 +134,7 @@ void run_cli(char* addr){
         return res;
     }
 
-    chat();
+    socialize();
 
     if(NULL != ctx){
         SSL_CTX_free(ctx);
@@ -147,7 +147,7 @@ void run_cli(char* addr){
     
 
 
-    return ret;
+    return 0;
 }
 
 
@@ -631,9 +631,9 @@ int join(){
 }
 
 
-void chat(){
+void socialize(){
 
-    printf("start the chat!\n");
+    printf("start the socialize!\n");
 
     sleep(5);
 

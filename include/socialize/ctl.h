@@ -14,7 +14,7 @@ int sig_verify(const char* cert_pem, const char* intermediate_pem);
 
 int extract_common_name(uint8_t* common_name, const char* cert);
 
-int idpw_verify(char* idpw);
+int idpw_verify(char* idpw, char* newid, uint8_t* newtoken);
 
 int update_chanctx_from_userinfo(char* id, char* pw);
 

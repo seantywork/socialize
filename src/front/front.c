@@ -3,6 +3,8 @@
 #include   "socialize/utils.h"
 
 
+struct user USER;
+
 struct settings s_settings = {true, 1, 57, NULL};
 
 uint64_t s_boot_timestamp = 0; 
@@ -36,6 +38,67 @@ void timer_sntp_fn(void *param) {  // SNTP timer function. Sync up time
 
 
 
+
+int load_config(){
+
+    char confbuff[MAX_BUFF] = {0};
+
+    int conflen = read_file_to_buffer(confbuff, MAX_BUFF, "config.json");
+
+    if(conflen < 0){
+  
+      printf("read config.json failed\n");
+  
+      return -1;
+    }
+
+    cJSON *conf_json_root = cJSON_Parse(confbuff);
+
+    if (conf_json_root == NULL){
+
+        printf("error parsing config.json\n");
+
+        return -1;
+
+    }
+
+    cJSON *conf_json = cJSON_GetObjectItemCaseSensitive(conf_json_root, "users");
+
+    if(conf_json == NULL){
+
+        printf("no users\n");
+
+        return -2;
+    }
+
+    int ulen = cJSON_GetArraySize(conf_json);
+    
+    if(ulen < 1){
+
+        printf("ulen < 1\n");
+
+        return -3;
+    }
+
+    for(int i = 0; i < ulen; i++){
+
+        cJSON* user = cJSON_GetArrayItem(conf_json, i);
+
+        cJSON* id = cJSON_GetObjectItemCaseSensitive(user, "id");
+
+        cJSON* pw = cJSON_GetObjectItemCaseSensitive(user, "pw");
+
+        
+        strcpy(USER.name, id->valuestring);
+
+        strcpy(USER.pass, pw->valuestring);
+
+        printf("loaded user: %s\n", USER.name);
+    }
+
+    return 0;
+
+}
 
 
 
@@ -87,11 +150,20 @@ void route(struct mg_connection *c, int ev, void *ev_data) {
 
         handle_healtiness_probe(c, hm);
 
-    } 
-    
-    printf("WS UPGRADE!!!!!\n");
+    } else if (mg_match(hm->uri, mg_str("/front"), NULL)) {
 
-    mg_ws_upgrade(c, hm, NULL);
+        printf("WS UPGRADE!!!!!\n");
+
+        mg_ws_upgrade(c, hm, NULL);
+
+    } else {
+
+        struct mg_http_serve_opts opts = {.root_dir = FRONT_WEB_ROOT};
+
+        mg_http_serve_dir(c, ev_data, &opts);
+
+    }
+    
     
     if(DEBUG_THIS == 1){
 
@@ -103,9 +175,15 @@ void route(struct mg_connection *c, int ev, void *ev_data) {
 
   } else if (ev == MG_EV_WS_MSG) {
 
+    struct mg_http_message *hm = (struct mg_http_message *) ev_data;
+
     struct mg_ws_message *wm = (struct mg_ws_message *) ev_data;
     
-    front_handler(c, wm);
+    if (mg_match(hm->uri, mg_str("/front"), NULL)) {
+
+        front_handler(c, wm);
+
+    } 
 
   }
 }
@@ -141,45 +219,36 @@ void front_handler(struct mg_connection *c, struct mg_ws_message *wm){
 
     char ws_data[WS_MAX_COMMAND_DATA_LEN] = {0};
 
-    cJSON* response = cJSON_CreateObject();
-
-    pthread_mutex_lock(&G_MTX);
-
     int datalen = 0;
 
-    int initial = 0;
+    int code = front_access(c, wm, ws_command, ws_data);
 
+    if (code < 0){
 
-    int auth_chan_idx = front_authenticate(c, wm, &initial, ws_command, ws_data);
-
-    if (auth_chan_idx < 0){
-
-        pthread_mutex_unlock(&G_MTX);
+        printf("front auth failed\n");
 
         return;
 
-    } 
-    
-    
-    if (initial == 1) {
+    } else if (code < 2){
 
-        fmt_logln(LOGFP, "connection authenticated");
-
-        pthread_mutex_unlock(&G_MTX);
+        printf("front auth success\n");
 
         return;
 
     }
 
-    front_communicate(auth_chan_idx, ws_command, ws_data);
+    front_communicate(c, wm, ws_command, ws_data);
 
-    pthread_mutex_unlock(&G_MTX);
     
 }
 
 
 
-int front_authenticate(struct mg_connection* c, struct mg_ws_message *wm, int* initial, char* command, char* data){
+int front_access(struct mg_connection* c, struct mg_ws_message *wm, char* command, char* data){
+
+
+    char id[MAX_ID_LEN] = {0};
+    uint8_t token[MAX_PW_LEN] = {0};
 
 
     char ws_buff[MAX_WS_BUFF] = {0};
@@ -191,7 +260,7 @@ int front_authenticate(struct mg_connection* c, struct mg_ws_message *wm, int* i
     if(wm->data.len > MAX_WS_BUFF){
 
         printf("failed handle ws: data too big\n");
-        cJSON_AddItemToObject(response, "status", cJSON_CreateString("fail"));
+        cJSON_AddItemToObject(response, "status", cJSON_CreateString("failed"));
         cJSON_AddItemToObject(response, "data", cJSON_CreateString("null"));
         
         strcpy(ws_buff, cJSON_Print(response));
@@ -211,7 +280,7 @@ int front_authenticate(struct mg_connection* c, struct mg_ws_message *wm, int* i
         printf("failed handle ws: data invalid\n");
 
 
-        cJSON_AddItemToObject(response, "status", cJSON_CreateString("fail"));
+        cJSON_AddItemToObject(response, "status", cJSON_CreateString("failed"));
         cJSON_AddItemToObject(response, "data", cJSON_CreateString("null"));
         
         strcpy(ws_buff, cJSON_Print(response));
@@ -230,7 +299,7 @@ int front_authenticate(struct mg_connection* c, struct mg_ws_message *wm, int* i
 
         printf("failed handle ws: data invalid\n");
 
-        cJSON_AddItemToObject(response, "status", cJSON_CreateString("fail"));
+        cJSON_AddItemToObject(response, "status", cJSON_CreateString("failed"));
         cJSON_AddItemToObject(response, "data", cJSON_CreateString("null"));
         
         strcpy(ws_buff, cJSON_Print(response));
@@ -244,7 +313,6 @@ int front_authenticate(struct mg_connection* c, struct mg_ws_message *wm, int* i
     }
 
 
-
     printf("command: %s\n", ws_command->valuestring);
 
     datalen = strlen(ws_command->valuestring);
@@ -253,7 +321,7 @@ int front_authenticate(struct mg_connection* c, struct mg_ws_message *wm, int* i
 
         printf("failed handle ws: command too long\n");
 
-        cJSON_AddItemToObject(response, "status", cJSON_CreateString("fail"));
+        cJSON_AddItemToObject(response, "status", cJSON_CreateString("failed"));
         cJSON_AddItemToObject(response, "data", cJSON_CreateString("null"));
         
         strcpy(ws_buff, cJSON_Print(response));
@@ -272,7 +340,7 @@ int front_authenticate(struct mg_connection* c, struct mg_ws_message *wm, int* i
 
         printf("failed handle ws: no data field\n");
 
-        cJSON_AddItemToObject(response, "status", cJSON_CreateString("fail"));
+        cJSON_AddItemToObject(response, "status", cJSON_CreateString("failed"));
         cJSON_AddItemToObject(response, "data", cJSON_CreateString("null"));
         
         strcpy(ws_buff, cJSON_Print(response));
@@ -291,7 +359,7 @@ int front_authenticate(struct mg_connection* c, struct mg_ws_message *wm, int* i
 
         printf("failed handle ws: data len too long\n");
 
-        cJSON_AddItemToObject(response, "status", cJSON_CreateString("fail"));
+        cJSON_AddItemToObject(response, "status", cJSON_CreateString("failed"));
         cJSON_AddItemToObject(response, "data", cJSON_CreateString("null"));
         
         strcpy(ws_buff, cJSON_Print(response));
@@ -304,73 +372,83 @@ int front_authenticate(struct mg_connection* c, struct mg_ws_message *wm, int* i
 
     }
 
-    int frontid = (int)c->id;
+    int cid = (int)c->id;
 
-    char user_id[MAX_ID_LEN] = {0};
+    if(USER.cid == cid){
 
+        strcpy(command, ws_command->valuestring);
 
-    // TODO:
-    //  simple check
+        strcpy(data, ws_data->valuestring);
 
-    int chan_idx = 0;
+        return 2;
+    }
 
-    if (chan_idx < 0){
+    int v = idpw_verify(ws_data->valuestring, id, token);
 
-        fmt_logln(LOGFP,"not registered to chan ctx, auth"); 
+    if(v < 0){
 
-        int v = idpw_verify(ws_data->valuestring);
+        fmt_logln(LOGFP,"invalid idpw"); 
+        printf("failed handle ws: invalid idpw\n");
+        cJSON_AddItemToObject(response, "status", cJSON_CreateString("failed"));
+        cJSON_AddItemToObject(response, "data", cJSON_CreateString("invalid idpw"));
+        
+        strcpy(ws_buff, cJSON_Print(response));
 
-        if(v < 0){
+        datalen = strlen(ws_buff);
 
-            fmt_logln(LOGFP,"invalid idpw"); 
-            printf("failed handle ws: invalid idpw\n");
-            cJSON_AddItemToObject(response, "status", cJSON_CreateString("fail"));
-            cJSON_AddItemToObject(response, "data", cJSON_CreateString("invalid idpw"));
-            
-            strcpy(ws_buff, cJSON_Print(response));
+        mg_ws_send(c, ws_buff, datalen, WEBSOCKET_OP_TEXT);
 
-            datalen = strlen(ws_buff);
+        return -10;
 
-            mg_ws_send(c, ws_buff, datalen, WEBSOCKET_OP_TEXT);
+    } else {
 
-            return -10;
-
-        } else {
-
-            fmt_logln(LOGFP, "auth success");
-
+        if(v == 0){
 
             fmt_logln(LOGFP, "initial auth success");
 
             printf("handle ws: initial auth success\n");
             cJSON_AddItemToObject(response, "status", cJSON_CreateString("success"));
-            cJSON_AddItemToObject(response, "data", cJSON_CreateString("accepted"));
+            cJSON_AddItemToObject(response, "data", cJSON_CreateString((char*)token));
             
             strcpy(ws_buff, cJSON_Print(response));
-
+    
             datalen = strlen(ws_buff);
-
+    
             mg_ws_send(c, ws_buff, datalen, WEBSOCKET_OP_TEXT);
 
-            *initial = 1;
+            return 0;
 
+        } else {
+
+            fmt_logln(LOGFP, "full auth success");
+
+            printf("handle ws: full auth success\n");
+            cJSON_AddItemToObject(response, "status", cJSON_CreateString("success"));
+            cJSON_AddItemToObject(response, "data", cJSON_CreateString("auth success"));
+            
+            strcpy(ws_buff, cJSON_Print(response));
+    
+            datalen = strlen(ws_buff);
+
+            int cid = (int)c->id;
+
+            USER.cid = cid;
+            
+            mg_ws_send(c, ws_buff, datalen, WEBSOCKET_OP_TEXT);
+
+            return 1;
         }
 
     }
 
-    strcpy(command, ws_command->valuestring);
 
-    strcpy(data, ws_data->valuestring);
-
-    fmt_logln(LOGFP, "auth success");
-
-    return chan_idx;
+    return -100;
 
 
 }
 
 
-void front_communicate(int chan_idx, char* command, char* data){
+void front_communicate(struct mg_connection* c, struct mg_ws_message *wm, char* command, char* data){
 
     char ws_buff[MAX_WS_BUFF] = {0};
 
@@ -378,69 +456,16 @@ void front_communicate(int chan_idx, char* command, char* data){
 
     int datalen = 0;
 
-    fmt_logln(LOGFP, "incoming front communication to sock");
+    fmt_logln(LOGFP, "incoming front communication");
 
-    int sockfd = CHAN_CTX[chan_idx].sockfd;
-
-    if(sockfd == 0){
-
-
-        fmt_logln(LOGFP, "no sock exists for communication");
-
-
-        return;
-
-    }
-
-
-    fmt_logln(LOGFP, "sock exists");
-
-    struct HUB_PACKET hp;
-
-    
     if (strcmp(command, WS_COMMAND_ROUNDTRIP) == 0) {
 
         fmt_logln(LOGFP, "roundtrip");
 
 
-        memset(hp.header, 0, HUB_HEADER_BYTELEN);
-
-        memset(hp.wbuff, 0, MAX_BUFF);
-
-        hp.ctx_type = CHAN_ISSOCK;
-
-        strcpy(hp.id, CHAN_CTX[chan_idx].id);
-
-        strcpy(hp.header, HUB_HEADER_SENDSOCK);
-
-        datalen = strlen(data);
-
-        hp.body_len = datalen;
-
-        strncpy(hp.wbuff, data, datalen);
-
-        hp.flag = 0;
-
-        ctx_write_packet(&hp);
-
-        if(hp.flag <= 0){
-
-            fmt_logln(LOGFP, "failed to send to sock");
-
-
-
-            return;
-        } 
-
-        fmt_logln(LOGFP, "send to sock");
-
-
     } else {
 
         printf("failed handle ws: no such command\n");
-
-        
-        return;
 
     }
 

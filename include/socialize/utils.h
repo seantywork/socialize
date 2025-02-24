@@ -18,8 +18,6 @@ int gen_random_bytestream(uint8_t* bytes, size_t num_bytes);
 int bin2hex(uint8_t* hexarray, int arrlen, uint8_t* bytearray);
 
 
-
-
 int get_host_port(char* hostname, int* port, char* addr);
 
 

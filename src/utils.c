@@ -59,6 +59,7 @@ int gen_random_bytestream(uint8_t* bytes, size_t num_bytes){
 int bin2hex(uint8_t* hexarray, int arrlen, uint8_t* bytearray){
 
     int hexlen = 2;
+    
 
     int outstrlen = hexlen * arrlen + 1;
 
@@ -67,19 +68,26 @@ int bin2hex(uint8_t* hexarray, int arrlen, uint8_t* bytearray){
         return -1;
     }
 
-    memset(hexarray, 0, outstrlen * sizeof(char));
+    uint8_t* tmparr = (uint8_t*)malloc(outstrlen * sizeof(uint8_t));
 
-    unsigned char* ptr = hexarray;
+    memset(tmparr, 0, outstrlen * sizeof(uint8_t));
+
+    unsigned char* ptr = tmparr;
 
     for(int i = 0 ; i < arrlen; i++){
 
         sprintf(ptr + 2 * i, "%02X", bytearray[i]);
     }
 
+    memset(hexarray, 0, outstrlen * sizeof(char));
+
+    memcpy(hexarray, tmparr, outstrlen);
+
+    free(tmparr);
+
     return 0;
     
 }
-
 
 int get_host_port(char* hostname, int* port, char* addr){
 

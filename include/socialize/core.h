@@ -125,6 +125,7 @@
 #define HTTPS_URL "https://0.0.0.0:3443"
 #endif
 
+#define FRONT_WEB_ROOT "public"
 
 #define IS_BIG_ENDIAN (!*(unsigned char *)&(uint16_t){1})
 
@@ -177,6 +178,9 @@
 struct user {
     char name[MAX_USER_NAME];
     char pass[MAX_USER_PASS];
+    int auth;
+    uint8_t token[MAX_PW_LEN];
+    int cid;
 };
 
 
@@ -247,6 +251,7 @@ extern char *s_json_header;
 
 extern struct mg_mgr mgr;
 
+extern struct user USER;
 
 extern struct CHANNEL_CONTEXT CHAN_CTX[MAX_CONN];
 

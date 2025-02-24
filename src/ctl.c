@@ -1,5 +1,5 @@
 #include "socialize/ctl.h"
-
+#include "socialize/utils.h"
 
 struct CHANNEL_CONTEXT CHAN_CTX[MAX_CONN];
 
@@ -129,16 +129,45 @@ int extract_common_name(uint8_t* common_name, const char* cert) {
 }
 
 
-int idpw_verify(char* idpw){
+int idpw_verify(char* idpw, char *newid, uint8_t* newtoken){
 
-    int verify = -1;
 
     char* token;
 
     char* delim = ":";
 
+    int idpwlen = strlen(idpw);
+
+    if(idpwlen > MAX_PW_LEN){
+        return -1;
+    }
+
     uint8_t id[MAX_ID_LEN] = {0};
     uint8_t pw[MAX_PW_LEN] = {0};
+
+    int istoken = 1;
+
+    for(int i = 0; i < idpwlen; i++){
+
+        if(idpw[i] == ':'){
+            istoken = 0;
+            break;
+        }
+
+    }
+
+    if(istoken == 1){
+
+        if(strncmp(USER.token, idpw, idpwlen) != 0){
+
+            return -2;
+        } else {
+
+            return 1;
+        }
+
+
+    }
 
     token = strtok(idpw, delim);
     
@@ -169,24 +198,24 @@ int idpw_verify(char* idpw){
         return -1;
     }
 
-    int chan_idx = get_chanctx_by_id(id);
 
-    if(chan_idx < 0){
-
-        return -2;
-
-    }
-
-    if(strncmp(CHAN_CTX[chan_idx].pw, pw, MAX_PW_LEN) != 0){
+    if(strncmp(USER.pass, pw, MAX_PW_LEN) != 0){
 
         return -3;
 
     }
 
-    int verified_idx = chan_idx;
+    memset(idpw, 0, idpwlen);
 
+    int idlen = strlen(id);
 
-    return verified_idx;
+    strncpy(newid, id, idlen);
+
+    int arrlen = gen_random_bytestream(newtoken, 64);
+
+    bin2hex(newtoken, arrlen, newtoken);
+
+    return 0;
 
 }
 

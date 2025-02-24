@@ -28,7 +28,7 @@ int auth();
 
 int join();
 
-void socialize();
+int socialize();
 
 void* reader();
 

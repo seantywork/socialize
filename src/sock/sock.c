@@ -644,6 +644,8 @@ void sock_register(int cfd){
 
     }
 
+    SOCK_CTX[sock_idx].chan_idx = result;
+
     fmt_logln(LOGFP, "register success sent");
 
     return;
@@ -654,7 +656,6 @@ void sock_register(int cfd){
 void sock_communicate(int chan_idx, int sock_idx){
 
     fmt_logln(LOGFP, "incoming sock communication ");
-
 
     struct HUB_PACKET hp;
 
@@ -680,17 +681,45 @@ void sock_communicate(int chan_idx, int sock_idx){
 
     //strcpy(hp.header, HUB_HEADER_RECVFRONT);
 
-    strncpy(hp.wbuff, hp.rbuff, hp.body_len);
-
     hp.flag = 0;
 
-    free(hp.rbuff);
-
     int counter = CHAN_CTX[chan_idx].fd_ptr;
+
+    int idlen = strlen(SOCK_CTX[sock_idx].id);
+
+    if(idlen + 2 + hp.body_len > MAX_BUFF){
+
+        fmt_logln(LOGFP, "total buf too long: id: %s", SOCK_CTX[sock_idx].id);
+
+        return;
+
+    }
+
+    memset(hp.wbuff, 0, MAX_BUFF);
+
+    strncat(hp.wbuff, SOCK_CTX[sock_idx].id, idlen);
+
+    strcat(hp.wbuff,": ");
+
+    strncat(hp.wbuff, hp.rbuff, hp.body_len);
+
+    hp.body_len = idlen + 2 + hp.body_len;
+
+    free(hp.rbuff);
 
     for(int i = 0; i < counter; i++){
 
         hp.fd = CHAN_CTX[chan_idx].fds[i];
+
+        int peersock_idx = get_sockctx_by_fd(hp.fd);
+
+        if(peersock_idx < 0){
+
+            fmt_logln(LOGFP, "failed to send to peer: no idx: %d", peersock_idx);
+
+            continue;
+
+        }
 
         ctx_write_packet(&hp);
 
@@ -701,7 +730,6 @@ void sock_communicate(int chan_idx, int sock_idx){
             continue;
         } 
     }
-
 
     fmt_logln(LOGFP, "sent to peer");
 

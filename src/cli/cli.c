@@ -61,7 +61,7 @@ int run_cli(char* addr){
 
         printf("load verification cert\n");
 
-        return -3;
+        goto EXIT_CLI;
     }
 
     ssl = SSL_new(ctx);
@@ -70,7 +70,7 @@ int run_cli(char* addr){
 
         printf("ssl new failed\n");
 
-        return -4;
+        goto EXIT_CLI;
     }
 
     res = connect_to_engine(addr, 30);
@@ -79,21 +79,22 @@ int run_cli(char* addr){
 
         printf("failed to connect: %d\n", res);
 
-        return -5;
+        goto EXIT_CLI;
     }
 
     fd = res;
 
     SSL_set_fd(ssl, fd);
 
-    
     res = SSL_connect(ssl);
 
     if(res != 1){
 
         printf("failed to handshake: %d\n", res);
 
-        return -6;
+        res = -1;
+
+        goto EXIT_CLI;
     }
 
     
@@ -103,7 +104,7 @@ int run_cli(char* addr){
 
         printf("failed to get peer cert\n");
 
-        return -7;
+        goto EXIT_CLI;
     }
     
 
@@ -113,7 +114,9 @@ int run_cli(char* addr){
 
         printf("ssl peer verification failed\n");
 
-        return -8;
+        res = -1;
+
+        goto EXIT_CLI;
     }
 
     res = auth();
@@ -122,7 +125,7 @@ int run_cli(char* addr){
 
         printf("failed to do auth\n");
 
-        return res;
+        goto EXIT_CLI;
     }
 
     res = join();
@@ -131,23 +134,29 @@ int run_cli(char* addr){
 
         printf("failed to do join\n");
 
-        return res;
+        goto EXIT_CLI;
     }
 
-    socialize();
+    res = socialize();
+
+    if(res < 0){
+
+        printf("failed to socialize\n");
+
+        goto EXIT_CLI;
+    }
+
+EXIT_CLI:
 
     if(NULL != ctx){
         SSL_CTX_free(ctx);
     }
-    
+
     if(ssl != NULL){
 
         SSL_free(ssl);
     }
-    
-
-
-    return 0;
+    return res;
 }
 
 
@@ -209,6 +218,7 @@ int connect_to_engine(char* addr, long timeout){
     u_timeout.tv_sec = 5;
     u_timeout.tv_usec = 0;
     
+    
     if (setsockopt (client_fd, SOL_SOCKET, SO_RCVTIMEO, &u_timeout, sizeof(u_timeout)) < 0){
 
         printf("set recv timeout\n");
@@ -225,6 +235,7 @@ int connect_to_engine(char* addr, long timeout){
     }
     
 
+    
     int rc = 0;
     
     int sockfd_flags_before;
@@ -631,17 +642,180 @@ int join(){
 }
 
 
-void socialize(){
+int socialize(){
 
-    printf("start the socialize!\n");
+    printf("start socializing!\n");
 
-    sleep(5);
+    pthread_t rt;
+    
+    int res = pthread_create(&rt, NULL, reader, NULL);
+
+    if(res < 0){
+        printf("reader creation failed\n");
+
+        return -1;
+    }
+    
+    for(;;){
+
+        char msg[MAX_BUFF] = {0};
+
+        int ccount = 0;
+
+        fgets(msg, MAX_BUFF, stdin);
+
+        if(cli_done == 1){
+            return 0;
+        }
+
+        for(int i = 0; i < MAX_BUFF; i++){
+
+            if(msg[i] == '\n'){
+
+                msg[i] = 0;
+
+                break;
+            }
+
+            ccount += 1;
+        }
+
+        uint64_t result64 = (uint64_t)ccount;
+
+        body_len_new = htonll(result64);
+    
+        memcpy(body_len, &body_len_new, HUB_BODY_BYTELEN);
+    
+        body = (uint8_t*)malloc(result64 * sizeof(uint8_t));
+    
+        memset(body, 0, result64 * sizeof(uint8_t));
+    
+        memcpy(body, msg, result64 * sizeof(uint8_t));
+    
+        int result = SSL_write(ssl, header, HUB_HEADER_BYTELEN);
+    
+        if (result < 0){
+    
+            printf("write header failed\n");
+
+            goto SOCIALIZE_CONTINUE;
+        }
+    
+        result = SSL_write(ssl, body_len, HUB_BODY_BYTELEN);
+    
+        if (result < 0){
+    
+            printf("write body len failed\n");
+    
+            goto SOCIALIZE_CONTINUE;
+        }
+     
+        result = SSL_write(ssl, body, result64 * sizeof(uint8_t));
+    
+        if (result < 0){
+    
+            printf("write body failed\n");
+    
+            goto SOCIALIZE_CONTINUE;
+        }
+
+SOCIALIZE_CONTINUE:
+    
+        free(body);
 
 
+    }
+
+    return 0;
 
 }
 
 void* reader(){
+
+    uint8_t rheader[HUB_HEADER_BYTELEN] = {0};
+    uint8_t rbodylen[HUB_BODY_BYTELEN] = {0};
+    uint64_t rbodylen_new = 0;
+    uint8_t *rbody = NULL;
+
+    int recvlen = 0;
+
+    int n = 0;
+
+    for(;;){
+
+        recvlen = 0;
+        n = 0;
+
+        while(recvlen != HUB_HEADER_BYTELEN){
+
+            n = SSL_read(ssl, header + recvlen, HUB_HEADER_BYTELEN - recvlen);
+    
+            if(cli_done == 1){
+                printf("read exit\n");
+                return NULL;
+            }
+
+            if(n <= 0){
+    
+                goto SOCIALIZE_R_CONTINUE;
+            }
+    
+            recvlen += n;
+    
+        }
+    
+        recvlen = 0;
+    
+        while(recvlen != HUB_BODY_BYTELEN){
+    
+            n = SSL_read(ssl, rbodylen + recvlen, HUB_BODY_BYTELEN - recvlen);
+    
+            if(n <= 0){
+    
+                printf("read body len failed\n");
+    
+                goto SOCIALIZE_R_CONTINUE;
+            }
+    
+            recvlen += n;
+    
+        }
+    
+        memcpy(&rbodylen_new, rbodylen, HUB_BODY_BYTELEN);
+    
+        uint64_t body_len_n = ntohll(rbodylen_new);
+    
+        rbody = (uint8_t*)malloc(body_len_n * sizeof(uint8_t));
+    
+        recvlen = 0;
+    
+        while(recvlen != body_len_n){
+    
+            n = SSL_read(ssl, rbody + recvlen, body_len_n - (uint64_t)recvlen);
+    
+            if(n <= 0){
+    
+                printf("read body failed\n");
+    
+                goto SOCIALIZE_R_CONTINUE;
+            }
+    
+            recvlen += n;
+    
+        }
+
+        printf("%s\n", rbody);
+
+SOCIALIZE_R_CONTINUE:
+
+        if(rbody != NULL){
+
+            free(rbody);
+
+            rbody = NULL;
+        }
+
+    }
 
 
 

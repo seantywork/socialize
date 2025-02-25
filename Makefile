@@ -1,10 +1,35 @@
+INFO := "socialize: dev, release"
+
+CC := gcc
 
 
-GCC_DEV_FLAGS := -Wall -g
+ifeq ($(CC), gcc)
 
-GCC_REL_FLAGS := -Wall
+	ifeq ($(ANA),y)
 
-GCC_OBJ_FLAGS := -Wall -c
+		FLAG := -fanalyzer -Wall -Wextra
+
+	else 
+		FLAG := -Wall -Wextra
+	endif
+
+endif
+
+
+ifeq ($(CC), gcc)
+	LINT := cppcheck --enable=all
+else 
+	LINT := clang-tidy -checks="*"
+endif
+
+CC_DEV_FLAGS := -Wall -g 
+
+CC_REL_FLAGS := -Wall
+
+CC_OBJ_FLAGS := $(FLAG) -c -g
+
+CC_DEP_OBJ_FLAGS := -c -g
+
 
 DEP_PACKAGES := libssl-dev
 
@@ -28,10 +53,16 @@ CLI_OBJS += utils.o
 DEP_OBJS := mongoose.o
 DEP_OBJS += cJSON.o
 
+LINT_LIST := lint_ctl
+LINT_LIST := lint_utils
+LINT_LIST := lint_sock 
+LINT_LIST := lint_front
+LINT_LIST := lint_cli
+
 
 all: 
 
-	@echo "socialize: dev, release"
+	@echo $(INFO)
 
 
 deps:
@@ -40,9 +71,6 @@ deps:
 
 	apt-get -y install $(DEP_PACKAGES)
 
-.PHONY: vendor
-vendor:
-
 	cd vendor && rm -rf mongoose && $(DEP_MONGOOSE)
 
 	cd vendor && rm -rf cJSON && $(DEP_CJSON)
@@ -50,55 +78,92 @@ vendor:
 
 dev: $(OBJS) $(CLI_OBJS) $(DEP_OBJS)
 
-	gcc $(GCC_DEV_FLAGS) $(INCLUDES) -o engine.out cmd/engine/main.c $(OBJS) $(DEP_OBJS) $(LIBS) 
+	$(CC) $(CC_DEV_FLAGS) $(INCLUDES) -o engine.out cmd/engine/main.c $(OBJS) $(DEP_OBJS) $(LIBS) 
 
-	gcc $(GCC_DEV_FLAGS) $(INCLUDES) -o cli.out cmd/cli/main.c $(CLI_OBJS) $(LIBS) 
+	$(CC) $(CC_DEV_FLAGS) $(INCLUDES) -o cli.out cmd/cli/main.c $(CLI_OBJS) $(LIBS) 
 
 
 
 
 release: $(OBJS) $(DEP_OBJS)
 
-	gcc $(GCC_REL_FLAGS) $(INCLUDES) -o engine.out cmd/engine/main.c $(OBJS) $(DEP_OBJS) $(LIBS) 
+	$(CC) $(CC_REL_FLAGS) $(INCLUDES) -o engine.out cmd/engine/main.c $(OBJS) $(DEP_OBJS) $(LIBS) 
 
-	gcc $(GCC_REL_FLAGS) $(INCLUDES) -o cli.out cmd/cli/main.c $(CLI_OBJS) $(LIBS) 
+	$(CC) $(CC_REL_FLAGS) $(INCLUDES) -o cli.out cmd/cli/main.c $(CLI_OBJS) $(LIBS) 
 
 
+lint: $(LINT_LIST) 
 
 ctl.o:
 
-	gcc $(GCC_OBJ_FLAGS) $(INCLUDES) -o ctl.o src/ctl.c 
+	$(CC) $(CC_OBJ_FLAGS) $(INCLUDES) -o ctl.o src/ctl.c 
 
 
 utils.o:
 
-	gcc $(GCC_OBJ_FLAGS) $(INCLUDES) -o utils.o src/utils.c 
+	$(CC) $(CC_OBJ_FLAGS) $(INCLUDES) -o utils.o src/utils.c 
 
 sock.o:
 
-	gcc $(GCC_OBJ_FLAGS) $(INCLUDES) -o sock.o src/sock/sock.c 
+	$(CC) $(CC_OBJ_FLAGS) $(INCLUDES) -o sock.o src/sock/sock.c 
 
 front.o:
 
-	gcc $(GCC_OBJ_FLAGS) $(INCLUDES) -o front.o src/front/front.c 
+	$(CC) $(CC_OBJ_FLAGS) $(INCLUDES) -o front.o src/front/front.c 
 
 
 cli.o:
 
-	gcc $(GCC_OBJ_FLAGS) $(INCLUDES) -o cli.o src/cli/cli.c 
+	$(CC) $(CC_OBJ_FLAGS) $(INCLUDES) -o cli.o src/cli/cli.c 
 
 
 
 mongoose.o:
 
 
-	gcc $(GCC_OBJ_FLAGS) $(INCLUDES) -o mongoose.o vendor/mongoose/mongoose.c 
+	$(CC) $(CC_DEP_OBJ_FLAGS) $(INCLUDES) -o mongoose.o vendor/mongoose/mongoose.c 
 
 cJSON.o:
 
-	gcc $(GCC_OBJ_FLAGS) $(INCLUDES) -o cJSON.o vendor/cJSON/cJSON.c 
+	$(CC) $(CC_DEP_OBJ_FLAGS) $(INCLUDES) -o cJSON.o vendor/cJSON/cJSON.c 
 
 
+lint_ctl:
+
+ifeq ($(CC),gcc)
+	$(LINT) $(INCLUDES) src/ctl.c 
+else 
+	$(LINT) src/ctl.c  -- $(INCLUDES)
+endif
+
+
+lint_utils:
+ifeq ($(CC),gcc)
+	$(LINT) $(INCLUDES) src/utils.c 
+else 
+	$(LINT) src/utils.c  -- $(INCLUDES)
+endif
+
+lint_sock:
+ifeq ($(CC),gcc)
+	$(LINT) $(INCLUDES) src/sock/sock.c 
+else 
+	$(LINT) src/sock/sock.c  -- $(INCLUDES)
+endif
+
+lint_front:
+ifeq ($(CC),gcc)
+	$(LINT) $(INCLUDES) src/front/front.c 
+else 
+	$(LINT) src/front/front.c  -- $(INCLUDES)
+endif
+
+lint_cli:
+ifeq ($(CC),gcc)
+	$(LINT) $(INCLUDES) src/cli/cli.c 
+else 
+	$(LINT) src/cli/cli.c  -- $(INCLUDES)
+endif
 
 
 clean:

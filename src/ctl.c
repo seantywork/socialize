@@ -205,15 +205,13 @@ int idpw_verify(char* idpw, char *newid, uint8_t* newtoken){
 
     }
 
-    memset(idpw, 0, idpwlen);
-
     int idlen = strlen(id);
 
     strncpy(newid, id, idlen);
 
-    int arrlen = gen_random_bytestream(newtoken, 64);
+    gen_random_bytestream(newtoken, 64);
 
-    bin2hex(newtoken, arrlen, newtoken);
+    bin2hex(newtoken, 64, newtoken);
 
     return 0;
 

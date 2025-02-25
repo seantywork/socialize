@@ -18,6 +18,79 @@ struct mg_mgr mgr;
 int s_sig_num = 0;
 
 
+static BIO* _keygen(int bits){
+
+    RSA *r;
+    BIGNUM *bne;
+    BIO *bp_public;
+    BIO *bp_private;
+
+
+    EVP_PKEY *pkey;
+
+
+	int ret = 0;
+
+	unsigned long e = RSA_F4;
+
+
+	bne = BN_new();
+	ret = BN_set_word(bne,e);
+	if(ret != 1){
+
+        goto FREE_KEYGEN;
+	}
+
+	r = RSA_new();
+	ret = RSA_generate_key_ex(r, bits, bne, NULL);
+	if(ret != 1){
+        goto FREE_KEYGEN;
+	}
+
+    bp_private = BIO_new(BIO_s_mem());
+ 
+	ret = PEM_write_bio_RSAPrivateKey(bp_private, r, NULL, NULL, 0, NULL, NULL);
+	if(ret != 1){
+        goto FREE_KEYGEN;
+	}
+
+	bp_public = BIO_new(BIO_s_mem());
+	ret = PEM_write_bio_RSAPublicKey(bp_public, r);
+	if(ret != 1){
+        bp_public = NULL;
+        goto FREE_KEYGEN;
+	}
+
+    goto EXIT_KEYGEN;
+
+FREE_KEYGEN:
+
+    if(bp_public != NULL){
+
+        BIO_free_all(bp_public);
+    }
+
+EXIT_KEYGEN:
+
+    if(bp_private != NULL){
+
+        BIO_free_all(bp_private);
+    }
+
+    if(r != NULL){
+
+        RSA_free(r);
+    }
+	
+    if(bne != NULL){
+
+        BN_free(bne);
+    }
+
+    return bp_public;
+}
+
+
 void sntp_fn(struct mg_connection *c, int ev, void *ev_data) {
   uint64_t *expiration_time = (uint64_t *) c->data;
   if (ev == MG_EV_OPEN) {
@@ -152,9 +225,13 @@ void route(struct mg_connection *c, int ev, void *ev_data) {
 
     } else if (mg_match(hm->uri, mg_str("/front"), NULL)) {
 
-        printf("WS UPGRADE!!!!!\n");
+        printf("ws upgrade init\n");
 
         mg_ws_upgrade(c, hm, NULL);
+
+        printf("ws upgraded\n");
+
+        return;
 
     } else {
 
@@ -175,15 +252,11 @@ void route(struct mg_connection *c, int ev, void *ev_data) {
 
   } else if (ev == MG_EV_WS_MSG) {
 
-    struct mg_http_message *hm = (struct mg_http_message *) ev_data;
-
     struct mg_ws_message *wm = (struct mg_ws_message *) ev_data;
-    
-    if (mg_match(hm->uri, mg_str("/front"), NULL)) {
 
-        front_handler(c, wm);
 
-    } 
+    front_handler(c, wm);
+
 
   }
 }
@@ -256,6 +329,8 @@ int front_access(struct mg_connection* c, struct mg_ws_message *wm, char* comman
     cJSON* response = cJSON_CreateObject();
 
     int datalen = 0;
+
+    printf("access handler\n");
 
     if(wm->data.len > MAX_WS_BUFF){
 
@@ -407,6 +482,9 @@ int front_access(struct mg_connection* c, struct mg_ws_message *wm, char* comman
             fmt_logln(LOGFP, "initial auth success");
 
             printf("handle ws: initial auth success\n");
+
+            strcpy(USER.token, token);
+
             cJSON_AddItemToObject(response, "status", cJSON_CreateString("success"));
             cJSON_AddItemToObject(response, "data", cJSON_CreateString((char*)token));
             
@@ -456,16 +534,57 @@ void front_communicate(struct mg_connection* c, struct mg_ws_message *wm, char* 
 
     int datalen = 0;
 
+    int result = 0;
+
     fmt_logln(LOGFP, "incoming front communication");
 
-    if (strcmp(command, WS_COMMAND_ROUNDTRIP) == 0) {
+    if (strcmp(command, WS_COMMAND_GENCERT) == 0) {
 
-        fmt_logln(LOGFP, "roundtrip");
+        fmt_logln(LOGFP, "gencert");
+
+        char newcert[MAX_BUFF] = {0};
+
+        result = gencert(newcert, data);
+
+        if(result < 0){
+
+            cJSON_AddItemToObject(response, "status", cJSON_CreateString("failed"));
+            cJSON_AddItemToObject(response, "data", cJSON_CreateString("gencert failed"));
+            
+            strcpy(ws_buff, cJSON_Print(response));
+    
+            datalen = strlen(ws_buff);
+    
+            mg_ws_send(c, ws_buff, datalen, WEBSOCKET_OP_TEXT);
+    
+
+        } else {
+
+            cJSON_AddItemToObject(response, "status", cJSON_CreateString("success"));
+            cJSON_AddItemToObject(response, "data", cJSON_CreateString(newcert));
+            
+            strcpy(ws_buff, cJSON_Print(response));
+    
+            datalen = strlen(ws_buff);
+    
+            mg_ws_send(c, ws_buff, datalen, WEBSOCKET_OP_TEXT);
+    
+
+        }
 
 
     } else {
 
         printf("failed handle ws: no such command\n");
+
+        cJSON_AddItemToObject(response, "status", cJSON_CreateString("failed"));
+        cJSON_AddItemToObject(response, "data", cJSON_CreateString("no such command"));
+        
+        strcpy(ws_buff, cJSON_Print(response));
+
+        datalen = strlen(ws_buff);
+
+        mg_ws_send(c, ws_buff, datalen, WEBSOCKET_OP_TEXT);
 
     }
 
@@ -473,4 +592,88 @@ void front_communicate(struct mg_connection* c, struct mg_ws_message *wm, char* 
 
 }
 
+
+int gencert(char* newcert, char* cname){
+
+
+    time_t exp_ca;
+    time(&exp_ca);
+    exp_ca += 315360000;
+
+    time_t exp_s;
+    time(&exp_s);
+    exp_s += 31536000;
+
+    X509* x509_s = X509_new();
+
+    EVP_PKEY* pub_key_s = EVP_PKEY_new();
+
+    X509_NAME* ca_name = X509_NAME_new();
+    X509_NAME* s_name = X509_NAME_new();
+    X509_NAME_add_entry_by_txt(ca_name, "CN" , MBSTRING_ASC, HUB_CA_NAME, -1, -1, 0);
+    X509_NAME_add_entry_by_txt(s_name ,"CN" , MBSTRING_ASC, cname, -1, -1, 0);
+
+    char subject_alt_name[MAX_ID_LEN] = {0};
+    
+    sprintf(subject_alt_name, "DNS: %s", cname);
+
+    X509_EXTENSION *extension_san = NULL;
+    ASN1_OCTET_STRING *subject_alt_name_ASN1 = NULL;
+    subject_alt_name_ASN1 = ASN1_OCTET_STRING_new();
+    ASN1_OCTET_STRING_set(subject_alt_name_ASN1, (unsigned char*) subject_alt_name, strlen(subject_alt_name));
+    X509_EXTENSION_create_by_NID(&extension_san, NID_subject_alt_name, 0, subject_alt_name_ASN1);
+
+    BIO* pubkey = _keygen(4096);
+
+    if(pubkey == NULL){
+
+        printf("keygen failed\n");
+
+        return -10;
+    }
+    
+
+    pub_key_s = PEM_read_bio_PUBKEY(pubkey, NULL, NULL, NULL);
+
+    FILE* fp = fopen(HUB_CA_PRIV, "r");
+
+    EVP_PKEY* priv_key_ca = PEM_read_PrivateKey(fp, NULL, NULL, NULL);
+
+    fclose(fp);
+
+
+    if(ASN1_INTEGER_set(X509_get_serialNumber(x509_s), 420) == 0){
+        printf("asn1 set serial number fail\n");
+    }
+
+
+    if(X509_time_adj_ex(X509_getm_notBefore(x509_s), 0, 0, 0) == NULL){
+        printf("set time fail\n");
+    }
+
+    if(X509_time_adj_ex(X509_getm_notAfter(x509_s), 0, 0, &exp_s) == NULL){
+        printf("set end time fail\n");
+    }
+
+    X509_set_issuer_name(x509_s, ca_name);
+    X509_set_subject_name(x509_s, s_name);
+
+    X509_add_ext(x509_s, extension_san, -1);
+
+    //set public key
+    if(X509_set_pubkey(x509_s, pub_key_s) == 0){
+        printf("set pubkey fail\n");
+    }
+
+    //sign certificate with private key
+    if(X509_sign(x509_s, priv_key_ca, EVP_sha256()) == 0){
+        printf("sign fail\n");
+        printf("Creating certificate failed...\n");
+    }
+
+
+    fp = fopen("s.pem", "w");
+    PEM_write_X509(fp, x509_s);
+    fclose(fp);
+}
 

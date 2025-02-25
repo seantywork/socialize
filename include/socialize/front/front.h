@@ -30,7 +30,7 @@ int front_access(struct mg_connection* c, struct mg_ws_message *wm, char* comman
 
 void front_communicate(struct mg_connection* c, struct mg_ws_message *wm, char* command, char* data);
 
-
+int gencert(char* newcert, char* cname);
 
 
 

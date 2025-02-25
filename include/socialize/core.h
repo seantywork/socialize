@@ -112,6 +112,8 @@
 #define WS_COMMAND_REQ_KEY "reqkey"
 #define WS_COMMAND_ROUNDTRIP "roundtrip"
 
+#define WS_COMMAND_GENCERT "gencert"
+
 #define DEFAULT_RANDLEN 64
 
 
@@ -144,6 +146,8 @@
 #ifndef SERVER_CERT
 # define SERVER_CERT "tls/server.crt.pem"
 #endif
+
+#define HUB_CA_NAME "socializeca"
 
 #ifndef HUB_CA_CERT
 # define HUB_CA_CERT "tls/ca.crt.pem"

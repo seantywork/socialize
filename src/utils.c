@@ -39,7 +39,7 @@ int gen_random_bytestream(uint8_t* bytes, size_t num_bytes){
 
     if(num_bytes > MAX_PW_LEN){
 
-    return -1;
+        return -1;
 
     }
 
@@ -48,7 +48,7 @@ int gen_random_bytestream(uint8_t* bytes, size_t num_bytes){
 
     for (i = 0; i < num_bytes; i++){
 
-    bytes[i] = rand();
+        bytes[i] = rand();
 
     }
 
@@ -60,7 +60,6 @@ int bin2hex(uint8_t* hexarray, int arrlen, uint8_t* bytearray){
 
     int hexlen = 2;
     
-
     int outstrlen = hexlen * arrlen + 1;
 
     if (outstrlen > MAX_PW_LEN){
@@ -82,6 +81,7 @@ int bin2hex(uint8_t* hexarray, int arrlen, uint8_t* bytearray){
     memset(hexarray, 0, outstrlen * sizeof(char));
 
     memcpy(hexarray, tmparr, outstrlen);
+
 
     free(tmparr);
 

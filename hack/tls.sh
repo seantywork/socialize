@@ -7,7 +7,7 @@ openssl genrsa -out ca_priv.pem 4096
 
 openssl rsa -in ca_priv.pem -outform PEM -pubout -out ca_pub.pem
 
-openssl req -x509 -new -key ca_priv.pem -days 365 -out ca.crt.pem -subj "/CN=testca"
+openssl req -x509 -new -key ca_priv.pem -days 365 -out ca.crt.pem -subj "/CN=socializeca"
 
 
 echo "gen server..."

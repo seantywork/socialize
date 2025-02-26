@@ -44,7 +44,7 @@ void print_error_string(unsigned long err, const char* const label);
 extern int cli_done;
 extern char* PREFERRED_CIPHERS;
 
-
+extern char* CERT_LOC;
 extern int TEST_CASE;
 
 extern SSL_CTX* ctx;

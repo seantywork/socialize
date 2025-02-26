@@ -31,6 +31,17 @@ int main(){
 
     return -1;
   }
+
+  result = init_all();
+
+  if(result < 0){
+
+    printf("failed to init all\n");
+
+    return -1;
+  }
+
+
   pthread_create(&front_tid, NULL, (void*)front_listen_and_serve, NULL);
 
   sleepms(500);

@@ -6,7 +6,6 @@ struct CHANNEL_CONTEXT CHAN_CTX[MAX_CONN];
 struct SOCK_CONTEXT SOCK_CTX[MAX_CONN];
 
 
-
 int make_socket_non_blocking (int sfd){
     int flags, s;
 
@@ -217,126 +216,20 @@ int idpw_verify(char* idpw, char *newid, uint8_t* newtoken){
 
 }
 
-int update_chanctx_from_userinfo(char* id, char* pw){
-
-    int ret_idx = -1;
-
-    int chan_idx = get_chanctx_by_id(id);
-
-    if(chan_idx < 0){
 
 
-        ret_idx = calloc_chanctx();
+int make_hash(int fd){
 
-        if(ret_idx < 0){
+    int hash = fd % MAX_CONN;
 
-            printf("id %s failed to calloc chanctx: max conn\n", id);
-
-            return -2;
-
-        }
-
-
-        strcpy(CHAN_CTX[ret_idx].id, id);
-        strcpy(CHAN_CTX[ret_idx].pw, pw);
-
-        chan_idx = ret_idx;
-
-        printf("id %s added to chanctx from userinfo\n", id);
-
-
-    } else {
-
-
-        strcpy(CHAN_CTX[chan_idx].pw, pw);
-
-
-        printf("id %s modified for existing chanctx from userinfo\n", id);
-
-
-    }
-
-
-
-    ret_idx = chan_idx;
-
-
-    return ret_idx;
-
+    return hash;
 }
-
-
-int update_chanctx_from_sockctx(int fd, char* id){
-
-
-    int ret_idx = -1;
-
-
-    int sock_idx = get_sockctx_by_fd(fd);
-
-    if(sock_idx < 0){
-
-        printf("no sock fd associated with: %d\n",fd);
-
-        return -1;
-    }
-
-    int chan_idx = get_chanctx_by_id(id);
-
-
-    if(chan_idx < 0){
-
-        ret_idx = calloc_chanctx();
-
-        if(ret_idx < 0){
-
-            printf("sock fd %d failed to calloc chanctx: max conn\n", fd);
-
-            return -2;
-
-        }
-
-        chan_idx = ret_idx;
-
-        CHAN_CTX[chan_idx].sockfd = SOCK_CTX[sock_idx].sockfd;
-        CHAN_CTX[chan_idx].ssl = SOCK_CTX[sock_idx].ssl;
-        CHAN_CTX[chan_idx].ctx = SOCK_CTX[sock_idx].ctx;
-
-        free_sockctx(sock_idx, 0);
-
-        strcpy(CHAN_CTX[chan_idx].id, id);
-
-        printf("id %s added to chanctx %d from sock\n", id, chan_idx);
-
-    } else {
-
-
-        CHAN_CTX[chan_idx].sockfd = SOCK_CTX[sock_idx].sockfd;
-        CHAN_CTX[chan_idx].ssl = SOCK_CTX[sock_idx].ssl;
-        CHAN_CTX[chan_idx].ctx = SOCK_CTX[sock_idx].ctx;
-
-        free_sockctx(sock_idx, 0);
-
-        printf("id %s modified for existing chanctx from sock\n", id);
-
-
-    }
-
-    ret_idx = chan_idx;
-
-    return ret_idx;
-
-}
-
-
-
-
 
 
 int set_sockctx_by_fd(int fd){
 
 
-    int new_idx = calloc_sockctx();
+    int new_idx = calloc_sockctx(fd);
 
     if(new_idx < 0){
 
@@ -345,45 +238,59 @@ int set_sockctx_by_fd(int fd){
 
     }
 
-    SOCK_CTX[new_idx].sockfd = fd;
-
-    return new_idx;
+    return 0;
 }
 
 
 
 
-int get_sockctx_by_fd(int fd){
+struct SOCK_CONTEXT* get_sockctx_by_fd(int fd){
 
+    int i = make_hash(fd);
 
-    for(int i = 0; i < MAX_CONN; i++){
+    //struct SOCK_CONTEXT* ctx = (struct SOCK_CONTEXT*)malloc(sizeof(struct SOCK_CONTEXT));
 
+    //memset(ctx, 0, sizeof(struct SOCK_CONTEXT));
 
-        if(SOCK_CTX[i].sockfd == fd){
+    struct SOCK_CONTEXT* ctx;
 
-            return i;
+    pthread_mutex_lock(&SOCK_CTX[i].lock);
+
+    ctx = &SOCK_CTX[i];
+
+    while(ctx != NULL){
+
+        if(ctx->sockfd == fd){
+
+            pthread_mutex_unlock(&SOCK_CTX[i].lock);
+
+            return ctx;
 
         }
 
+        ctx = ctx->next;
 
     }
 
+    pthread_mutex_unlock(&SOCK_CTX[i].lock);
 
+    //free(ctx);
 
-    return -1;
+    return NULL;
 }
 
 
 int set_sockctx_id_by_fd(int fd, char* id){
 
-    int idx = get_sockctx_by_fd(fd);
+    struct SOCK_CONTEXT* ctx = get_sockctx_by_fd(fd);
 
-    if(idx < 0){
+    if(ctx == NULL){
 
         return -1;
     }
 
-    memcpy(SOCK_CTX[idx].id, id, MAX_ID_LEN);
+    memcpy(ctx->id, id, MAX_ID_LEN);
+
 
     return 0;
 }
@@ -391,15 +298,14 @@ int set_sockctx_id_by_fd(int fd, char* id){
 int get_sockctx_id_by_fd(int fd, char* id){
 
 
+    struct SOCK_CONTEXT* ctx = get_sockctx_by_fd(fd);
 
-    int idx = get_sockctx_by_fd(fd);
-
-    if(idx < 0){
+    if(ctx == NULL){
 
         return -1;
     }
 
-    memcpy(id, SOCK_CTX[idx].id, MAX_ID_LEN);
+    memcpy(id, ctx->id, MAX_ID_LEN);
 
     return 0;
 
@@ -474,14 +380,14 @@ int get_chanctx_by_id(char* id){
 int set_sockctx_chan_id_by_fd(int fd, int chan_id){
 
 
-    int idx = get_sockctx_by_fd(fd);
+    struct SOCK_CONTEXT* ctx = get_sockctx_by_fd(fd);
 
-    if(idx < 0){
+    if(ctx == NULL){
 
         return -1;
     }
 
-    SOCK_CTX[idx].chan_idx = chan_id;
+    ctx->chan_idx = chan_id;
 
     return 0;
 
@@ -493,20 +399,24 @@ int set_sockctx_chan_id_by_fd(int fd, int chan_id){
 int get_sockctx_chan_id_by_fd(int fd){
 
 
-    int idx = get_sockctx_by_fd(fd);
+    struct SOCK_CONTEXT* ctx = get_sockctx_by_fd(fd);
 
-    if(idx < 0){
+    if(ctx == NULL){
 
         return -1;
     }
 
-    return SOCK_CTX[idx].chan_idx;
+    int chan_idx = ctx->chan_idx;
+
+
+    return chan_idx;
 
 }
 
 
 
 int calloc_chanctx(){
+
 
     for(int i = 0; i < MAX_CONN; i++){
 
@@ -578,209 +488,88 @@ int free_chanctx(int idx){
 }
 
 
-int calloc_sockctx(){
+int calloc_sockctx(int fd){
 
-    for(int i = 0; i < MAX_CONN; i++){
+    int i = make_hash(fd);
 
-        if(SOCK_CTX[i].allocated == 0){
+    struct SOCK_CONTEXT* ctx = NULL;
 
-            SOCK_CTX[i].ctx = NULL;
-            SOCK_CTX[i].ssl = NULL;
-            SOCK_CTX[i].sockfd = 0;
-            SOCK_CTX[i].chan_idx = -1;
+    pthread_mutex_lock(&SOCK_CTX[i].lock);
 
-            SOCK_CTX[i].allocated = 1;
+    ctx = &SOCK_CTX[i];
+
+    while(ctx != NULL){
+
+        if(ctx->allocated == 0){
+
+            ctx->ctx = NULL;
+            ctx->ssl = NULL;
+            ctx->sockfd = fd;
+            ctx->chan_idx = -1;
+            ctx->allocated = 1;
+
+            pthread_mutex_unlock(&SOCK_CTX[i].lock);
 
             return i;
 
         }
 
+        ctx = ctx->next;
 
     }
 
+    pthread_mutex_unlock(&SOCK_CTX[i].lock);
 
     return -1;
 }
 
 
 
-int free_sockctx(int idx, int memfree){
+int free_sockctx(int fd, int memfree){
 
 
-    if (idx >= MAX_CONN){
-        return -10;
+    int i = make_hash(fd);
+
+    struct SOCK_CONTEXT* ctx = NULL;
+
+    pthread_mutex_lock(&SOCK_CTX[i].lock);
+
+    ctx = &SOCK_CTX[i];
+
+    while(ctx != NULL){
+
+        if(ctx->sockfd == fd){
+
+            if(memfree == 1){
+
+                SSL_shutdown(ctx->ssl);
+                SSL_free(ctx->ssl);
+                SSL_CTX_free(ctx->ctx);
+        
+            } else {
+        
+                ctx->ssl = NULL;
+                ctx->ctx = NULL;
+        
+            }
+        
+            ctx->sockfd = 0;
+            ctx->allocated = 0;
+
+            pthread_mutex_unlock(&SOCK_CTX[i].lock);
+
+            return 0;
+        }
+
+        ctx = ctx->next;
+
     }
 
-    if(SOCK_CTX[idx].allocated != 1){
-        return -1;
-    }
+    pthread_mutex_unlock(&SOCK_CTX[i].lock);
 
-    if(memfree == 1){
-
-        SSL_shutdown(SOCK_CTX[idx].ssl);
-        SSL_free(SOCK_CTX[idx].ssl);
-        SSL_CTX_free(SOCK_CTX[idx].ctx);
-
-    } else {
-
-        SOCK_CTX[idx].ssl = NULL;
-        SOCK_CTX[idx].ctx = NULL;
-
-    }
-
-    SOCK_CTX[idx].sockfd = 0;
-    SOCK_CTX[idx].allocated = 0;
-
-
-    return 0;
+    return -1;
 }
 
-
-int chanctx_write(int type, char* id, int write_len, uint8_t* wbuff){
-
-    if(type == ISSOCK){
-
-        int valwrite = 0;
-
-        int chan_idx = 0;
-
-        chan_idx = get_chanctx_by_id(id);
-
-        if(chan_idx < 0){
-
-            printf("write: no such id: %s\n", id);
-
-            return -1;
-        }
-
-
-        SSL* sslfd = CHAN_CTX[chan_idx].ssl;
-
-
-        valwrite = SSL_write(sslfd, wbuff, write_len);
-
-
-        if (valwrite <= 0){
-
-            printf("write: client gone: %d\n", valwrite);
-
-            return -2;
-
-        }
-
-        return valwrite;
-
-
-    }
-
-
-    printf("invalid chanctx write type: %d\n", type);
-
-    return -100;
-
-
-}
-
-int chanctx_read(int type, char* id, int read_len, uint8_t* rbuff){
-
-    if(type == ISSOCK){
-
-        int valread = 0;
-
-        int chan_idx = 0;
-
-        int ms_until_deadline = 0;
-
-        chan_idx = get_chanctx_by_id(id);
-
-        if(chan_idx < 0){
-
-            printf("read: no such id: %s\n", id);
-
-            return -1;
-        }
-
-
-        SSL* sslfd = CHAN_CTX[chan_idx].ssl;
-
-        uint8_t* rbuff_tmp = (uint8_t*)malloc(read_len * sizeof(uint8_t));
-
-        memset(rbuff_tmp, 0, read_len * sizeof(uint8_t));
-
-        int valread_tmp = 0;
-
-        struct timespec rnow;
-
-        clock_gettime(CLOCK_MONOTONIC_RAW, &rnow);
-
-        struct timespec rdeadline;
-
-        while(valread < read_len){
-
-            clock_gettime(CLOCK_MONOTONIC_RAW, &rdeadline);
-
-            ms_until_deadline = ((rdeadline.tv_sec - rnow.tv_sec) * 1000 + (rdeadline.tv_nsec - rnow.tv_nsec) / 1000000);
-
-            if(ms_until_deadline > HUB_TIMEOUT_MS){
-                
-                printf("time limit exceeded\n");
-
-                free(rbuff_tmp);
-
-                return -10;
-            }
-
-            valread_tmp = SSL_read(sslfd, (void*)rbuff_tmp, read_len);
-
-            if(valread_tmp <= 0){
-                
-                if(errno == EAGAIN){
-
-                    memset(rbuff_tmp, 0, read_len * sizeof(uint8_t));
-
-                    valread_tmp = 0;
-
-                    continue;
-                }
-
-                printf("read: client gone: %d\n", valread);
-
-                free(rbuff_tmp);
-
-                return -2;
-            }
-
-            for(int i = 0 ; i < valread_tmp; i++){
-
-                int idx = valread + i;
-
-                rbuff[idx] = rbuff_tmp[i];
-
-            }
-
-            valread += valread_tmp;        
-
-            memset(rbuff_tmp, 0, read_len * sizeof(uint8_t));
-
-            valread_tmp = 0;
-
-        }
-
-
-        free(rbuff_tmp);
-
-        return valread;
-
-
-    }
-
-
-    printf("invalid chanctx read type: %d\n", type);
-
-    return -100;
-
-
-}
 
 
 int sockctx_write(int fd, int write_len, uint8_t* wbuff){
@@ -788,19 +577,18 @@ int sockctx_write(int fd, int write_len, uint8_t* wbuff){
 
     int valwrite = 0;
 
-    int sock_idx = 0;
+    struct SOCK_CONTEXT* sockctx = NULL;
 
-    sock_idx = get_sockctx_by_fd(fd);
+    sockctx = get_sockctx_by_fd(fd);
 
-    if(sock_idx < 0){
+    if(sockctx == NULL){
 
         printf("write: no such fd: %d\n", fd);
 
         return -1;
     }
 
-    SSL* sslfd = SOCK_CTX[sock_idx].ssl;
-
+    SSL* sslfd = sockctx->ssl;
 
     valwrite = SSL_write(sslfd, (void*)wbuff, write_len);
 
@@ -808,12 +596,14 @@ int sockctx_write(int fd, int write_len, uint8_t* wbuff){
 
         printf("write: client gone: %d\n", valwrite);
 
+        ;
+
         return -2;
 
     }
 
-    return valwrite;
 
+    return valwrite;
 
 
 }
@@ -828,9 +618,9 @@ int sockctx_read(int fd, int read_len, uint8_t* rbuff){
 
     int ms_until_deadline = 0;
 
-    sock_idx = get_sockctx_by_fd(fd);
+    struct SOCK_CONTEXT* sockctx = get_sockctx_by_fd(fd);
 
-    if(sock_idx < 0){
+    if(sockctx == NULL){
 
         printf("read: no such fd: %d\n", fd);
 
@@ -838,7 +628,7 @@ int sockctx_read(int fd, int read_len, uint8_t* rbuff){
     }
 
 
-    SSL* sslfd = SOCK_CTX[sock_idx].ssl;
+    SSL* sslfd = sockctx->ssl;
 
     uint8_t* rbuff_tmp = (uint8_t*)malloc(read_len * sizeof(uint8_t));
 
@@ -852,6 +642,9 @@ int sockctx_read(int fd, int read_len, uint8_t* rbuff){
 
     struct timespec rdeadline;
 
+    // TODO:
+    //  simplify
+
     while(valread < read_len){
 
         clock_gettime(CLOCK_MONOTONIC_RAW, &rdeadline);
@@ -861,6 +654,7 @@ int sockctx_read(int fd, int read_len, uint8_t* rbuff){
         if(ms_until_deadline > HUB_TIMEOUT_MS){
             
             printf("time limit exceeded\n");
+
 
             free(rbuff_tmp);
 
@@ -881,6 +675,7 @@ int sockctx_read(int fd, int read_len, uint8_t* rbuff){
             }
 
             printf("read: client gone: %d\n", valread);
+
 
             free(rbuff_tmp);
 

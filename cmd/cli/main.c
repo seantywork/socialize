@@ -3,6 +3,7 @@
 
 int cli_done = 0;
 int TEST_CASE = -1;
+char* CERT_LOC = NULL;
 
 
 static void signal_handler(int sig){
@@ -15,21 +16,18 @@ static void signal_handler(int sig){
 int main(int argc, char **argv){
 
 
-    if(argc < 2){
-        printf("feed arguments\n");
-        printf("addr, or addr + number\n");
-
-        return -1;
-    }
-
 
     signal(SIGINT, signal_handler);
 
     int ret;
 
-    if(argc == 2){
+    if(argc != 3){
 
-        ret = run_cli(argv[1]);
+        printf("feed arguments\n");
+
+        printf("addr:port number | cert location\n");
+
+        return -1;
 
 
     } else {
@@ -48,9 +46,9 @@ int main(int argc, char **argv){
 
         } else {
 
-            printf("wrong argument: %s\n", argv[2]);
+            CERT_LOC = argv[2];
 
-            return -1;
+            ret = run_cli(argv[1]);
 
         }
 

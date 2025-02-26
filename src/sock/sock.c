@@ -14,6 +14,24 @@ char CA_PRIV[MAX_PW_LEN] = {0};
 
 char CA_PUB[MAX_PW_LEN] = {0};
 
+int init_all(){
+
+
+    for(int i = 0 ; i < MAX_CONN; i++){
+
+        pthread_mutex_init(&SOCK_CTX[i].lock, NULL);
+
+        SOCK_CTX[i].next = NULL;
+
+    }
+
+    // TODO:
+    //  init bucket
+
+    return 0;
+}
+
+
 void sock_listen_and_serve(void* varg){
 
     int result = 0;
@@ -284,11 +302,9 @@ void sock_handle_conn(){
             exit(EXIT_FAILURE);
         }
 
-        int sock_idx = set_sockctx_by_fd(infd);
+        int res = set_sockctx_by_fd(infd);
 
-
-
-        if(sock_idx < 0){
+        if(res < 0){
 
             fmt_logln(LOGFP, "failed new conn sockctx");
 
@@ -296,10 +312,21 @@ void sock_handle_conn(){
 
         }
 
-        SOCK_CTX[sock_idx].ctx = ctx;
-        SOCK_CTX[sock_idx].ssl = ssl;
-        SOCK_CTX[sock_idx].auth = 0;
+        struct SOCK_CONTEXT* sockctx = get_sockctx_by_fd(infd);
 
+        if(sockctx == NULL){
+
+            fmt_logln(LOGFP, "failed new conn sockctx");
+
+            exit(EXIT_FAILURE);
+
+        }
+
+        sockctx->ctx = ctx;
+        sockctx->ssl = ssl;
+        sockctx->auth = 0;
+
+        
 
         SOCK_EVENT.data.fd = infd;
         SOCK_EVENT.events = EPOLLIN | EPOLLET;
@@ -308,6 +335,7 @@ void sock_handle_conn(){
 
             fmt_logln(LOGFP,"handle epoll add failed");  
 
+            
 
             exit(EXIT_FAILURE);
 
@@ -316,7 +344,6 @@ void sock_handle_conn(){
             fmt_logln(LOGFP,"handle epoll add success"); 
 
         }
-
 
 
     }
@@ -332,25 +359,29 @@ void sock_handle_client(int cfd){
 
     pthread_mutex_lock(&G_MTX);
 
-    int sock_idx = get_sockctx_by_fd(cfd);
+    struct SOCK_CONTEXT* sockctx = get_sockctx_by_fd(cfd);
 
 
-    if(sock_idx < 0){
+    if(sockctx == NULL){
         
         pthread_mutex_unlock(&G_MTX);
 
         return;
     }
 
-    if(SOCK_CTX[sock_idx].auth == 0){
+
+    if(sockctx->auth == 0){
 
         sock_authenticate(cfd);
+
+        
 
         pthread_mutex_unlock(&G_MTX);
 
         return;
     }
 
+    
 
     int chan_idx = get_sockctx_chan_id_by_fd(cfd);
 
@@ -363,7 +394,7 @@ void sock_handle_client(int cfd){
         return;
     }
 
-    sock_communicate(chan_idx, sock_idx);
+    sock_communicate(chan_idx, cfd);
 
     pthread_mutex_unlock(&G_MTX);
 
@@ -383,11 +414,11 @@ void sock_authenticate(int cfd){
 
     uint8_t id[MAX_ID_LEN] = {0};
 
-    int sock_idx = get_sockctx_by_fd(cfd);
+    struct SOCK_CONTEXT* sockctx = get_sockctx_by_fd(cfd);
 
     fmt_logln(LOGFP,"not registered to sock ctx, auth"); 
 
-    if(sock_idx < 0){
+    if(sockctx == NULL){
 
         fmt_logln(LOGFP,"failed to get sock idx"); 
 
@@ -396,8 +427,8 @@ void sock_authenticate(int cfd){
 
 
     hp.ctx_type = ISSOCK;
-    hp.fd = SOCK_CTX[sock_idx].sockfd;
-    
+    hp.fd = sockctx->sockfd;
+
     ctx_read_packet(&hp);
 
     if(hp.flag <= 0){
@@ -405,7 +436,9 @@ void sock_authenticate(int cfd){
 
         fmt_logln(LOGFP,"failed to read sock"); 
 
-        free_sockctx(sock_idx, 1);
+        
+
+        free_sockctx(cfd, 1);
 
         return;
 
@@ -417,7 +450,9 @@ void sock_authenticate(int cfd){
 
         fmt_logln(LOGFP,"not authenticate header: %s", hp.header); 
 
-        free_sockctx(sock_idx, 1);
+        
+
+        free_sockctx(cfd, 1);
 
         return;
 
@@ -430,7 +465,9 @@ void sock_authenticate(int cfd){
 
         fmt_logln(LOGFP,"invalid signature"); 
 
-        free_sockctx(sock_idx, 1);
+        
+
+        free_sockctx(cfd, 1);
 
         free(hp.rbuff);
 
@@ -446,7 +483,9 @@ void sock_authenticate(int cfd){
 
         fmt_logln(LOGFP,"invalid id"); 
 
-        free_sockctx(sock_idx, 1);
+        
+
+        free_sockctx(cfd, 1);
 
         free(hp.rbuff);
 
@@ -465,7 +504,9 @@ void sock_authenticate(int cfd){
 
         fmt_logln(LOGFP, "failed to set sockctx");
 
-        free_sockctx(sock_idx, 1);
+        
+
+        free_sockctx(cfd, 1);
 
         free(hp.rbuff);
 
@@ -473,24 +514,10 @@ void sock_authenticate(int cfd){
 
     }
 
-    SOCK_CTX[sock_idx].auth = 1;
+    sockctx->auth = 1;
 
-    /*
+    
 
-    int chan_idx = update_chanctx_from_sockctx(cfd, id);
-
-    if (chan_idx < 0){
-
-        fmt_logln(LOGFP, "failed to update chanctx");
-
-        free_sockctx(sock_idx, 1);
-
-        return;
-
-    }
-
-
-    */
     uint64_t body_len = strlen("SUCCESS") + 1;
 
     memset(hp.header, 0, HUB_HEADER_BYTELEN);
@@ -542,11 +569,11 @@ void sock_register(int cfd){
 
     uint8_t id[MAX_ID_LEN] = {0};
 
-    int sock_idx = get_sockctx_by_fd(cfd);
+    struct SOCK_CONTEXT *sockctx = get_sockctx_by_fd(cfd);
 
     fmt_logln(LOGFP,"not registered to sock ctx, register"); 
 
-    if(sock_idx < 0){
+    if(sockctx == NULL){
 
         fmt_logln(LOGFP,"failed to get sock idx"); 
 
@@ -555,7 +582,7 @@ void sock_register(int cfd){
 
 
     hp.ctx_type = ISSOCK;
-    hp.fd = SOCK_CTX[sock_idx].sockfd;
+    hp.fd = sockctx->sockfd;
     
     ctx_read_packet(&hp);
 
@@ -564,7 +591,9 @@ void sock_register(int cfd){
 
         fmt_logln(LOGFP,"failed to read sock"); 
 
-        free_sockctx(sock_idx, 1);
+        
+
+        free_sockctx(cfd, 1);
 
         return;
 
@@ -591,7 +620,9 @@ void sock_register(int cfd){
 
         fmt_logln(LOGFP,"not register header: %s", hp.header); 
 
-        free_sockctx(sock_idx, 1);
+        
+
+        free_sockctx(cfd, 1);
 
         return;
 
@@ -602,7 +633,9 @@ void sock_register(int cfd){
 
         fmt_logln(LOGFP,"failed to register: result: %d", result); 
 
-        free_sockctx(sock_idx, 1);
+        
+
+        free_sockctx(cfd, 1);
 
         return;
     }
@@ -640,11 +673,13 @@ void sock_register(int cfd){
 
         fmt_logln(LOGFP, "failed to send");
 
+        
+
         return;
 
     }
 
-    SOCK_CTX[sock_idx].chan_idx = result;
+    sockctx->chan_idx = result;
 
     fmt_logln(LOGFP, "register success sent");
 
@@ -653,15 +688,27 @@ void sock_register(int cfd){
 }
 
 
-void sock_communicate(int chan_idx, int sock_idx){
+void sock_communicate(int chan_idx, int cfd){
 
     fmt_logln(LOGFP, "incoming sock communication ");
 
     struct HUB_PACKET hp;
 
+    hp.fd = -1;
+
+    struct SOCK_CONTEXT* sockctx = get_sockctx_by_fd(cfd);
+
+    if(sockctx == NULL){
+
+        fmt_logln(LOGFP, "failed to get sockctx");
+
+        return;
+
+    }
+
     hp.ctx_type = ISSOCK;
 
-    hp.fd = SOCK_CTX[sock_idx].sockfd;
+    hp.fd = sockctx->sockfd;
 
     ctx_read_packet(&hp);
 
@@ -669,6 +716,7 @@ void sock_communicate(int chan_idx, int sock_idx){
 
         fmt_logln(LOGFP, "failed to communicate sock read");
 
+    
         return;
 
     }
@@ -685,11 +733,13 @@ void sock_communicate(int chan_idx, int sock_idx){
 
     int counter = CHAN_CTX[chan_idx].fd_ptr;
 
-    int idlen = strlen(SOCK_CTX[sock_idx].id);
+    int idlen = strlen(sockctx->id);
 
     if(idlen + 2 + hp.body_len > MAX_BUFF){
 
-        fmt_logln(LOGFP, "total buf too long: id: %s", SOCK_CTX[sock_idx].id);
+        fmt_logln(LOGFP, "total buf too long: id: %s", sockctx->id);
+
+        
 
         return;
 
@@ -697,7 +747,7 @@ void sock_communicate(int chan_idx, int sock_idx){
 
     memset(hp.wbuff, 0, MAX_BUFF);
 
-    strncat(hp.wbuff, SOCK_CTX[sock_idx].id, idlen);
+    strncat(hp.wbuff, sockctx->id, idlen);
 
     strcat(hp.wbuff,": ");
 
@@ -707,19 +757,25 @@ void sock_communicate(int chan_idx, int sock_idx){
 
     free(hp.rbuff);
 
+    // TODO:
+    //  invalid if client gone
+    //  use reallocate
+
     for(int i = 0; i < counter; i++){
 
-        hp.fd = CHAN_CTX[chan_idx].fds[i];
+        int peerfd = CHAN_CTX[chan_idx].fds[i];
 
-        int peersock_idx = get_sockctx_by_fd(hp.fd);
+        struct SOCK_CONTEXT* peerctx = get_sockctx_by_fd(peerfd);
 
-        if(peersock_idx < 0){
+        if(peerctx == NULL){
 
-            fmt_logln(LOGFP, "failed to send to peer: no idx: %d", peersock_idx);
+            fmt_logln(LOGFP, "failed to send to peer: no peer for: %d", peerfd);
 
             continue;
 
         }
+
+        hp.fd = peerfd;
 
         ctx_write_packet(&hp);
 
@@ -729,8 +785,10 @@ void sock_communicate(int chan_idx, int sock_idx){
 
             continue;
         } 
+
     }
 
+    
     fmt_logln(LOGFP, "sent to peer");
 
     return;

@@ -28,5 +28,7 @@ void sleepms(long ms);
 
 void fmt_logln(FILE *fp, char* fmt_out, ...);
 
+// TODO:
+//  logger
 
 #endif

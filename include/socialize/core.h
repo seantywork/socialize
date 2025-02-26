@@ -209,6 +209,8 @@ struct SOCK_CONTEXT {
     int auth;
     char id[MAX_ID_LEN];
     int chan_idx;
+    pthread_mutex_t lock;
+    struct SOCK_CONTEXT *next;
 };
 
 

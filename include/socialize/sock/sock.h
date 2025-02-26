@@ -5,6 +5,7 @@
 
 #include "socialize/core.h"
 
+int init_all();
 
 
 void sock_listen_and_serve(void* varg);

@@ -560,7 +560,7 @@ void front_communicate(struct mg_connection* c, struct mg_ws_message *wm, char* 
 
         } else {
 
-            cJSON_AddItemToObject(response, "status", cJSON_CreateString("success"));
+            cJSON_AddItemToObject(response, "status", cJSON_CreateString(WS_COMMAND_GENCERT));
             cJSON_AddItemToObject(response, "data", cJSON_CreateString(newcert));
             
             strcpy(ws_buff, cJSON_Print(response));
@@ -595,6 +595,8 @@ void front_communicate(struct mg_connection* c, struct mg_ws_message *wm, char* 
 
 int gencert(char* newcert, char* cname){
 
+    // TODO:
+    //  gencert leak check
 
     time_t exp_ca;
     time(&exp_ca);
@@ -671,9 +673,33 @@ int gencert(char* newcert, char* cname){
         printf("Creating certificate failed...\n");
     }
 
+    BIO *x509_bio = BIO_new(BIO_s_mem());
 
-    fp = fopen("s.pem", "w");
-    PEM_write_X509(fp, x509_s);
-    fclose(fp);
+    if(!PEM_write_bio_X509(x509_bio, x509_s)){
+
+        BIO_free(x509_bio);
+
+        printf("failed to write cert data\n");
+
+        return -11;
+
+    }
+
+    unsigned char *certbuff;
+
+    int outlen = BIO_get_mem_data(x509_bio, &certbuff);
+
+    if (outlen < 1){
+        BIO_free(x509_bio);
+
+        printf("failed to get cert data\n");
+        return -12;
+    }
+
+    strncpy(newcert, certbuff, outlen);
+
+    BIO_free(x509_bio);
+
+    return 0;
 }
 

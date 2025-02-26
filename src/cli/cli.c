@@ -333,12 +333,13 @@ int auth(){
 
         result = read_file_to_buffer(cert, MAX_PW_LEN, SUB1_CERT);
 
-    }
-
-
-    if(TEST_CASE == 2){
+    } else if(TEST_CASE == 2){
 
         result = read_file_to_buffer(cert, MAX_PW_LEN, SUB2_CERT);
+
+    } else {
+
+        result = read_file_to_buffer(cert, MAX_PW_LEN, CERT_LOC);
 
     }
 
@@ -643,6 +644,9 @@ int join(){
 
 
 int socialize(){
+
+    // TODO:
+    //  fix prompt at the bottom
 
     printf("start socializing!\n");
 

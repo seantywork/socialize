@@ -1,9 +1,9 @@
 #include "socialize/ctl.h"
 #include "socialize/utils.h"
 
-struct CHANNEL_CONTEXT CHAN_CTX[MAX_CONN];
 
-struct SOCK_CONTEXT SOCK_CTX[MAX_CONN];
+// TODO:
+//  rehashing
 
 
 int make_socket_non_blocking (int sfd){
@@ -254,15 +254,23 @@ struct SOCK_CONTEXT* get_sockctx_by_fd(int fd){
 
     struct SOCK_CONTEXT* ctx;
 
-    pthread_mutex_lock(&SOCK_CTX[i].lock);
+    struct SOCK_CONTEXT_LOCK* ctxlock;
 
-    ctx = &SOCK_CTX[i];
+    spinlock_lock(&SOCK_CTL.slock);
+
+    ctx = SOCK_CTL.SOCK_CTX[i];
+
+    ctxlock = SOCK_CTL.SOCK_CTX_LOCK[i];
+
+    spinlock_unlock(&SOCK_CTL.slock);
+
+    pthread_mutex_lock(&ctxlock->lock);
 
     while(ctx != NULL){
 
         if(ctx->sockfd == fd){
 
-            pthread_mutex_unlock(&SOCK_CTX[i].lock);
+            pthread_mutex_unlock(&ctxlock->lock);
 
             return ctx;
 
@@ -272,7 +280,8 @@ struct SOCK_CONTEXT* get_sockctx_by_fd(int fd){
 
     }
 
-    pthread_mutex_unlock(&SOCK_CTX[i].lock);
+    pthread_mutex_unlock(&ctxlock->lock);
+
 
     //free(ctx);
 
@@ -494,9 +503,17 @@ int calloc_sockctx(int fd){
 
     struct SOCK_CONTEXT* ctx = NULL;
 
-    pthread_mutex_lock(&SOCK_CTX[i].lock);
+    struct SOCK_CONTEXT_LOCK* ctxlock = NULL;
 
-    ctx = &SOCK_CTX[i];
+    spinlock_lock(&SOCK_CTL.slock);
+
+    ctx = SOCK_CTL.SOCK_CTX[i];
+
+    ctxlock = SOCK_CTL.SOCK_CTX_LOCK[i];
+
+    spinlock_unlock(&SOCK_CTL.slock);
+
+    pthread_mutex_lock(&ctxlock->lock);
 
     while(ctx != NULL){
 
@@ -508,7 +525,7 @@ int calloc_sockctx(int fd){
             ctx->chan_idx = -1;
             ctx->allocated = 1;
 
-            pthread_mutex_unlock(&SOCK_CTX[i].lock);
+            pthread_mutex_unlock(&ctxlock->lock);
 
             return i;
 
@@ -518,7 +535,7 @@ int calloc_sockctx(int fd){
 
     }
 
-    pthread_mutex_unlock(&SOCK_CTX[i].lock);
+    pthread_mutex_unlock(&ctxlock->lock);
 
     return -1;
 }
@@ -532,9 +549,17 @@ int free_sockctx(int fd, int memfree){
 
     struct SOCK_CONTEXT* ctx = NULL;
 
-    pthread_mutex_lock(&SOCK_CTX[i].lock);
+    struct SOCK_CONTEXT_LOCK* ctxlock = NULL;
 
-    ctx = &SOCK_CTX[i];
+    spinlock_lock(&SOCK_CTL.slock);
+
+    ctx = SOCK_CTL.SOCK_CTX[i];
+
+    ctxlock = SOCK_CTL.SOCK_CTX_LOCK[i];
+
+    spinlock_unlock(&SOCK_CTL.slock);
+
+    pthread_mutex_lock(&ctxlock->lock);
 
     while(ctx != NULL){
 
@@ -556,7 +581,7 @@ int free_sockctx(int fd, int memfree){
             ctx->sockfd = 0;
             ctx->allocated = 0;
 
-            pthread_mutex_unlock(&SOCK_CTX[i].lock);
+            pthread_mutex_unlock(&ctxlock->lock);
 
             return 0;
         }
@@ -565,7 +590,7 @@ int free_sockctx(int fd, int memfree){
 
     }
 
-    pthread_mutex_unlock(&SOCK_CTX[i].lock);
+    pthread_mutex_unlock(&ctxlock->lock);
 
     return -1;
 }
@@ -868,3 +893,30 @@ void ctx_read_packet(struct HUB_PACKET* hp){
 
 
 
+
+static inline bool atomic_compare_exchange(int* ptr, int compare, int exchange) {
+    return __atomic_compare_exchange_n(ptr, &compare, exchange,
+            0, __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST);
+}
+
+static inline void atomic_store(int* ptr, int value) {
+    __atomic_store_n(ptr, 0, __ATOMIC_SEQ_CST);
+}
+
+static inline int atomic_add_fetch(int* ptr, int d) {
+    return __atomic_add_fetch(ptr, d, __ATOMIC_SEQ_CST);
+}
+
+
+void spinlock_init(struct spinlock* spinlock) {
+    atomic_store(&spinlock->locked, 0);
+}
+
+void spinlock_lock(struct spinlock* spinlock) {
+    while (!atomic_compare_exchange(&spinlock->locked, 0, 1)) {
+    }
+}
+
+void spinlock_unlock(struct spinlock* spinlock) {
+    atomic_store(&spinlock->locked, 0);
+}

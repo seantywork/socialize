@@ -48,8 +48,11 @@ int gen_random_bytestream(uint8_t* bytes, size_t num_bytes){
 
     for (i = 0; i < num_bytes; i++){
 
-        bytes[i] = rand();
-
+        if (0 >getrandom(bytes + i, 1, 0)){
+    
+          return -2;
+        }
+      
     }
 
     return 0;

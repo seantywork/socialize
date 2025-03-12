@@ -10,6 +10,7 @@
 #include <stdint.h>
 #include <sys/types.h>
 #include <sys/socket.h>  
+#include <sys/random.h>
 #include <unistd.h> 
 #include <time.h>
 #include <endian.h>
@@ -177,7 +178,9 @@
 
 
 
-
+struct spinlock {
+    int locked;
+};
 
 struct user {
     char name[MAX_USER_NAME];
@@ -209,12 +212,20 @@ struct SOCK_CONTEXT {
     int auth;
     char id[MAX_ID_LEN];
     int chan_idx;
-    pthread_mutex_t lock;
     struct SOCK_CONTEXT *next;
 };
 
+struct SOCK_CONTEXT_LOCK {
+
+    pthread_mutex_t lock;
+};
 
 
+struct SOCK_CTL {
+    struct spinlock slock;
+    struct SOCK_CONTEXT** SOCK_CTX;
+    struct SOCK_CONTEXT_LOCK** SOCK_CTX_LOCK;
+};
 
 struct HUB_PACKET {
 
@@ -261,8 +272,7 @@ extern struct user USER;
 
 extern struct CHANNEL_CONTEXT CHAN_CTX[MAX_CONN];
 
-extern struct SOCK_CONTEXT SOCK_CTX[MAX_CONN];
-
+extern struct SOCK_CTL SOCK_CTL;
 
 
 extern FILE* LOGFP;

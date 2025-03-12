@@ -14,19 +14,41 @@ char CA_PRIV[MAX_PW_LEN] = {0};
 
 char CA_PUB[MAX_PW_LEN] = {0};
 
+
+struct CHANNEL_CONTEXT CHAN_CTX[MAX_CONN];
+
+// struct SOCK_CONTEXT SOCK_CTX[MAX_CONN];
+
+struct SOCK_CTL SOCK_CTL;
+
 int init_all(){
 
+    for(int i = 0 ; i < MAX_CONN;i ++){
 
-    for(int i = 0 ; i < MAX_CONN; i++){
+        CHAN_CTX[i].ssl = NULL;
+        CHAN_CTX[i].ctx = NULL;
 
-        pthread_mutex_init(&SOCK_CTX[i].lock, NULL);
-
-        SOCK_CTX[i].next = NULL;
 
     }
 
-    // TODO:
-    //  init bucket
+
+    spinlock_init(&SOCK_CTL.slock);
+
+    SOCK_CTL.SOCK_CTX = (struct SOCK_CONTEXT**)malloc(MAX_CONN * sizeof(struct SOCK_CONTEXT*));
+
+    SOCK_CTL.SOCK_CTX_LOCK = (struct SOCK_CONTEXT_LOCK**)malloc(MAX_CONN * sizeof(struct SOCK_CONTEXT_LOCK*));
+
+    for(int i = 0; i < MAX_CONN; i++){
+
+        SOCK_CTL.SOCK_CTX[i] = (struct SOCK_CONTEXT*)malloc(sizeof(struct SOCK_CONTEXT));
+
+        SOCK_CTL.SOCK_CTX_LOCK[i] = (struct SOCK_CONTEXT_LOCK*)malloc(sizeof(struct SOCK_CONTEXT_LOCK));
+
+        memset(SOCK_CTL.SOCK_CTX[i], 0, sizeof(struct SOCK_CONTEXT));
+
+        pthread_mutex_init(&SOCK_CTL.SOCK_CTX_LOCK[i]->lock, NULL);
+
+    }
 
     return 0;
 }
@@ -72,14 +94,6 @@ void sock_listen_and_serve(void* varg){
 
 
     struct sockaddr_in SERVADDR;
-
-    for(int i = 0 ; i < MAX_CONN;i ++){
-
-        CHAN_CTX[i].ssl = NULL;
-        CHAN_CTX[i].ctx = NULL;
-
-
-    }
 
 
     //signal(SIGPIPE, SIG_IGN);

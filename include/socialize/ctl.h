@@ -63,6 +63,11 @@ void ctx_write_packet(struct HUB_PACKET* hp);
 void ctx_read_packet(struct HUB_PACKET* hp);
 
 
+void spinlock_init(struct spinlock* spinlock);
+
+void spinlock_lock(struct spinlock* spinlock);
+
+void spinlock_unlock(struct spinlock* spinlock);
 
 
 #endif

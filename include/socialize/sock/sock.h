@@ -7,6 +7,7 @@
 
 int init_all();
 
+int free_all();
 
 void sock_listen_and_serve(void* varg);
 

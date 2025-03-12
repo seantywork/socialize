@@ -23,6 +23,7 @@ struct SOCK_CTL SOCK_CTL;
 
 int init_all(){
 
+
     for(int i = 0 ; i < MAX_CONN;i ++){
 
         CHAN_CTX[i].ssl = NULL;
@@ -31,6 +32,7 @@ int init_all(){
 
     }
 
+    SOCK_CTL.in_use = 1;
 
     spinlock_init(&SOCK_CTL.slock);
 
@@ -55,6 +57,26 @@ int init_all(){
     return 0;
 }
 
+int free_all(){
+
+    spinlock_lock(&SOCK_CTL.slock);
+
+    SOCK_CTL.in_use = 0;
+
+    for(int i = 0; i < SOCK_CTL.size; i++){
+
+        free(SOCK_CTL.SOCK_CTX[i]);
+
+        free(SOCK_CTL.SOCK_CTX_LOCK[i]);
+
+    }
+
+    free(SOCK_CTL.SOCK_CTX);
+
+    free(SOCK_CTL.SOCK_CTX_LOCK);
+
+    spinlock_unlock(&SOCK_CTL.slock);
+}
 
 void sock_listen_and_serve(void* varg){
 

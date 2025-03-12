@@ -256,6 +256,15 @@ struct SOCK_CONTEXT* get_sockctx_by_fd(int fd){
 
     spinlock_lock(&SOCK_CTL.slock);
 
+    if(SOCK_CTL.in_use == 0){
+
+        printf("sockctl not in use\n");
+
+        spinlock_unlock(&SOCK_CTL.slock);
+
+        return NULL;
+    }
+
     int i = make_hash(fd, SOCK_CTL.size);
 
     ctx = SOCK_CTL.SOCK_CTX[i];
@@ -506,6 +515,15 @@ int calloc_sockctx(int fd){
 
     spinlock_lock(&SOCK_CTL.slock);
 
+    if(SOCK_CTL.in_use == 0){
+
+        printf("sockctl not in use\n");
+
+        spinlock_unlock(&SOCK_CTL.slock);
+
+        return -1;
+    }
+
     int i = make_hash(fd, SOCK_CTL.size);
 
     ctx = SOCK_CTL.SOCK_CTX[i];
@@ -551,6 +569,16 @@ int free_sockctx(int fd, int memfree){
     struct SOCK_CONTEXT_LOCK* ctxlock = NULL;
 
     spinlock_lock(&SOCK_CTL.slock);
+
+    if(SOCK_CTL.in_use == 0){
+
+        printf("sockctl not in use\n");
+
+        spinlock_unlock(&SOCK_CTL.slock);
+
+        return -1;
+    }
+
 
     int i = make_hash(fd, SOCK_CTL.size);
 

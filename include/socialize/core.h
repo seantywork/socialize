@@ -222,6 +222,7 @@ struct SOCK_CONTEXT_LOCK {
 
 
 struct SOCK_CTL {
+    int in_use;
     struct spinlock slock;
     int size;
     struct SOCK_CONTEXT** SOCK_CTX;

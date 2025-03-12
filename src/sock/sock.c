@@ -34,6 +34,8 @@ int init_all(){
 
     spinlock_init(&SOCK_CTL.slock);
 
+    SOCK_CTL.size = MAX_CONN;
+
     SOCK_CTL.SOCK_CTX = (struct SOCK_CONTEXT**)malloc(MAX_CONN * sizeof(struct SOCK_CONTEXT*));
 
     SOCK_CTL.SOCK_CTX_LOCK = (struct SOCK_CONTEXT_LOCK**)malloc(MAX_CONN * sizeof(struct SOCK_CONTEXT_LOCK*));

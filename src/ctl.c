@@ -218,9 +218,9 @@ int idpw_verify(char* idpw, char *newid, uint8_t* newtoken){
 
 
 
-int make_hash(int fd){
+int make_hash(int fd, int buck_size){
 
-    int hash = fd % MAX_CONN;
+    int hash = fd % buck_size;
 
     return hash;
 }
@@ -246,8 +246,6 @@ int set_sockctx_by_fd(int fd){
 
 struct SOCK_CONTEXT* get_sockctx_by_fd(int fd){
 
-    int i = make_hash(fd);
-
     //struct SOCK_CONTEXT* ctx = (struct SOCK_CONTEXT*)malloc(sizeof(struct SOCK_CONTEXT));
 
     //memset(ctx, 0, sizeof(struct SOCK_CONTEXT));
@@ -257,6 +255,8 @@ struct SOCK_CONTEXT* get_sockctx_by_fd(int fd){
     struct SOCK_CONTEXT_LOCK* ctxlock;
 
     spinlock_lock(&SOCK_CTL.slock);
+
+    int i = make_hash(fd, SOCK_CTL.size);
 
     ctx = SOCK_CTL.SOCK_CTX[i];
 
@@ -499,13 +499,14 @@ int free_chanctx(int idx){
 
 int calloc_sockctx(int fd){
 
-    int i = make_hash(fd);
 
     struct SOCK_CONTEXT* ctx = NULL;
 
     struct SOCK_CONTEXT_LOCK* ctxlock = NULL;
 
     spinlock_lock(&SOCK_CTL.slock);
+
+    int i = make_hash(fd, SOCK_CTL.size);
 
     ctx = SOCK_CTL.SOCK_CTX[i];
 
@@ -545,13 +546,13 @@ int calloc_sockctx(int fd){
 int free_sockctx(int fd, int memfree){
 
 
-    int i = make_hash(fd);
-
     struct SOCK_CONTEXT* ctx = NULL;
 
     struct SOCK_CONTEXT_LOCK* ctxlock = NULL;
 
     spinlock_lock(&SOCK_CTL.slock);
+
+    int i = make_hash(fd, SOCK_CTL.size);
 
     ctx = SOCK_CTL.SOCK_CTX[i];
 

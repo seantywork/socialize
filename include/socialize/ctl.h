@@ -18,7 +18,7 @@ int extract_common_name(uint8_t* common_name, const char* cert);
 int idpw_verify(char* idpw, char* newid, uint8_t* newtoken);
 
 
-int make_hash(int fd);
+int make_hash(int fd, int buck_size);
 
 int set_sockctx_by_fd(int fd);
 

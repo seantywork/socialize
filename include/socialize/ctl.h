@@ -65,9 +65,9 @@ void ctx_read_packet(struct HUB_PACKET* hp);
 
 void spinlock_init(struct spinlock* spinlock);
 
-void spinlock_lock(struct spinlock* spinlock);
+void pthread_mutext_lock(struct spinlock* spinlock);
 
-void spinlock_unlock(struct spinlock* spinlock);
+void pthread_mutext_unlock(struct spinlock* spinlock);
 
 
 #endif

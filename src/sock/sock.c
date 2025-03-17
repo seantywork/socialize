@@ -34,7 +34,7 @@ int init_all(){
 
     SOCK_CTL.in_use = 1;
 
-    spinlock_init(&SOCK_CTL.slock);
+    pthread_mutex_init(&SOCK_CTL.slock, NULL);
 
     SOCK_CTL.size = MAX_CONN;
 
@@ -59,7 +59,7 @@ int init_all(){
 
 int free_all(){
 
-    pthread_mutext_lock(&SOCK_CTL.slock);
+    pthread_mutex_lock(&SOCK_CTL.slock);
 
     SOCK_CTL.in_use = 0;
 
@@ -75,7 +75,7 @@ int free_all(){
 
     free(SOCK_CTL.SOCK_CTX_LOCK);
 
-    pthread_mutext_unlock(&SOCK_CTL.slock);
+    pthread_mutex_unlock(&SOCK_CTL.slock);
 }
 
 void sock_listen_and_serve(void* varg){

@@ -254,13 +254,13 @@ struct SOCK_CONTEXT* get_sockctx_by_fd(int fd){
 
     struct SOCK_CONTEXT_LOCK* ctxlock;
 
-    pthread_mutext_lock(&SOCK_CTL.slock);
+    pthread_mutex_lock(&SOCK_CTL.slock);
 
     if(SOCK_CTL.in_use == 0){
 
         printf("sockctl not in use\n");
 
-        pthread_mutext_unlock(&SOCK_CTL.slock);
+        pthread_mutex_unlock(&SOCK_CTL.slock);
 
         return NULL;
     }
@@ -271,7 +271,7 @@ struct SOCK_CONTEXT* get_sockctx_by_fd(int fd){
 
     ctxlock = SOCK_CTL.SOCK_CTX_LOCK[i];
 
-    pthread_mutext_unlock(&SOCK_CTL.slock);
+    pthread_mutex_unlock(&SOCK_CTL.slock);
 
     pthread_mutex_lock(&ctxlock->lock);
 
@@ -513,13 +513,13 @@ int calloc_sockctx(int fd){
 
     struct SOCK_CONTEXT_LOCK* ctxlock = NULL;
 
-    pthread_mutext_lock(&SOCK_CTL.slock);
+    pthread_mutex_lock(&SOCK_CTL.slock);
 
     if(SOCK_CTL.in_use == 0){
 
         printf("sockctl not in use\n");
 
-        pthread_mutext_unlock(&SOCK_CTL.slock);
+        pthread_mutex_unlock(&SOCK_CTL.slock);
 
         return -1;
     }
@@ -530,7 +530,7 @@ int calloc_sockctx(int fd){
 
     ctxlock = SOCK_CTL.SOCK_CTX_LOCK[i];
 
-    pthread_mutext_unlock(&SOCK_CTL.slock);
+    pthread_mutex_unlock(&SOCK_CTL.slock);
 
     pthread_mutex_lock(&ctxlock->lock);
 
@@ -568,13 +568,13 @@ int free_sockctx(int fd, int memfree){
 
     struct SOCK_CONTEXT_LOCK* ctxlock = NULL;
 
-    pthread_mutext_lock(&SOCK_CTL.slock);
+    pthread_mutex_lock(&SOCK_CTL.slock);
 
     if(SOCK_CTL.in_use == 0){
 
         printf("sockctl not in use\n");
 
-        pthread_mutext_unlock(&SOCK_CTL.slock);
+        pthread_mutex_unlock(&SOCK_CTL.slock);
 
         return -1;
     }
@@ -586,7 +586,7 @@ int free_sockctx(int fd, int memfree){
 
     ctxlock = SOCK_CTL.SOCK_CTX_LOCK[i];
 
-    pthread_mutext_unlock(&SOCK_CTL.slock);
+    pthread_mutex_unlock(&SOCK_CTL.slock);
 
     pthread_mutex_lock(&ctxlock->lock);
 
@@ -941,11 +941,11 @@ void spinlock_init(struct spinlock* spinlock) {
     atomic_store(&spinlock->locked, 0);
 }
 
-void pthread_mutext_lock(struct spinlock* spinlock) {
+void spinlock_lock(struct spinlock* spinlock) {
     while (!atomic_compare_exchange(&spinlock->locked, 0, 1)) {
     }
 }
 
-void pthread_mutext_unlock(struct spinlock* spinlock) {
+void spinlock_unlock(struct spinlock* spinlock) {
     atomic_store(&spinlock->locked, 0);
 }

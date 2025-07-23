@@ -26,9 +26,9 @@ void get_current_time_string(char* tstr);
 
 void sleepms(long ms);
 
-void fmt_logln(FILE *fp, char* fmt_out, ...);
+#define fmt_logln(fp, fmt, ...) _fmt_logln(fp,__FILE__, __LINE__, fmt,  ##__VA_ARGS__)
 
-// TODO:
-//  logger
+void _fmt_logln(FILE *fp, char* file, int line, char* fmt_out, ...);
+
 
 #endif

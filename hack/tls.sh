@@ -48,6 +48,6 @@ echo "signiing sub2..."
 openssl  x509 -req -extfile <(printf "subjectAltName = DNS:sub2.test") -days 180 -in sub2.csr -CA ca.crt.pem -CAkey ca_priv.pem -CAcreateserial -sha256 -out sub2.crt.pem
 
 
-/bin/cp -Rf *.pem ../tls/
+/bin/cp -Rf *.pem ./tls/
 
 rm -rf *.pem *.srl *.csr

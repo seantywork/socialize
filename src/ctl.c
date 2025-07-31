@@ -216,7 +216,7 @@ int idpw_verify(char* idpw, char *newid, uint8_t* newtoken){
 
 }
 
-static inline uint32_t _hashfunc(uint8_t* data, size_t size){
+static inline uint32_t _fnv(uint8_t* data, size_t size){
 
 	size_t nblocks = size / 8;
 	uint64_t hash = 2166136261u;
@@ -253,9 +253,23 @@ static inline uint32_t _hashfunc(uint8_t* data, size_t size){
 	return hash;
 }
 
+static inline uint32_t _hashfunc(uint8_t* data, size_t size){
+	uint32_t hashtrunc = 0;
+	uint8_t hash[32] = {0};
+	EVP_MD_CTX *mdctx;
+	int digest_len = 0;
+	mdctx = EVP_MD_CTX_new();
+	EVP_DigestInit_ex(mdctx, EVP_sha256(), NULL);
+	EVP_DigestUpdate(mdctx, data, size);
+	EVP_DigestFinal_ex(mdctx, hash, &digest_len);
+	EVP_MD_CTX_free(mdctx);
+	memcpy(&hashtrunc, hash, sizeof(uint32_t));
+    return hashtrunc;
+}
+
 int make_hash(int fd, int buck_size){
 
-    int hash = _hashfunc((uint8_t*)&fd, sizeof(int));
+    uint32_t hash = _hashfunc((uint8_t*)&fd, sizeof(int));
 
     return hash % buck_size;
 }
